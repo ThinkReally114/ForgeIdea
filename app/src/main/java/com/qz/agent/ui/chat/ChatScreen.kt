@@ -26,6 +26,7 @@ import org.koin.androidx.compose.koinViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
+    onOpenSettings: () -> Unit,
     viewModel: ChatViewModel = koinViewModel()
 ) {
     val messages by viewModel.messages.collectAsState()
@@ -42,6 +43,11 @@ fun ChatScreen(
         topBar = {
             TopAppBar(
                 title = { Text("QZ Agent") },
+                actions = {
+                    androidx.compose.material3.TextButton(onClick = onOpenSettings) {
+                        Text("设置")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = androidx.compose.ui.graphics.Color.Transparent
                 )
