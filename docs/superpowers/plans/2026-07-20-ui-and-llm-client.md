@@ -4,9 +4,9 @@
 
 **Goal:** 搭建安卓项目骨架，实现 QZMusic 风格 UI 层（聊天界面 + 代码查看器 + 划选评论）和 LLM 客户端（Zen API 流式调用），跑通"发消息收到 AI 回复"的最小闭环。
 
-**Architecture:** 原生 Kotlin + Jetpack Compose + Material 3。五层架构中的 UI 层和 LLM 客户端先行，Agent 引擎用最小桩实现（直接转发用户消息给 LLM，无工具调用）。UI 采用 QZ 风格视觉系统（Haze 毛玻璃 + ComposeMeshGradient 渐变背景 + M3Color 动态取色 + 胶囊组件）。LLM 客户端用 Ktor + SSE 流式调 OpenCode Zen API。
+**Architecture:** 原生 Kotlin + Jetpack Compose + Material 3。五层架构中的 UI 层和 LLM 客户端先行，Agent 引擎用最小桩实现（直接转发用户消息给 LLM，无工具调用）。UI 采用 QZ 风格视觉系统（Haze 毛玻璃 + 纯色深色背景 + M3Color 动态取色 + 胶囊组件）。LLM 客户端用 Ktor + SSE 流式调 OpenCode Zen API。
 
-**Tech Stack:** Kotlin, Jetpack Compose, Material 3, Haze, ComposeMeshGradient, M3Color, Capsule, dotlottie-android, Ktor Client, kotlinx.serialization, Room, DataStore, Coil, Koin
+**Tech Stack:** Kotlin, Jetpack Compose, Material 3, Haze, M3Color, Capsule, dotlottie-android, Ktor Client, kotlinx.serialization, Room, DataStore, Coil, Koin
 
 **参考设计文档:** `docs/superpowers/specs/2026-07-20-android-agent-design.md`
 
@@ -63,7 +63,6 @@ app/
 │   │   │   ├── theme/
 │   │   │   │   ├── Theme.kt             # QZ 主题入口
 │   │   │   │   ├── ColorSchemes.kt      # 预设主题色板
-│   │   │   │   ├── Gradients.kt         # 渐变背景定义
 │   │   │   │   ├── Type.kt              # 字体
 │   │   │   │   └── Shapes.kt            # 形状(胶囊等)
 │   │   │   ├── components/
@@ -73,7 +72,6 @@ app/
 │   │   │   │   ├── CommentSheet.kt      # 划选评论面板
 │   │   │   │   ├── ChatInput.kt         # 胶囊输入框
 │   │   │   │   ├── ToolTag.kt           # 工具调用胶囊标签
-│   │   │   │   ├── GradientBackground.kt # 网格渐变背景
 │   │   │   │   └── CapsuleButton.kt     # 胶囊按钮
 │   │   │   ├── chat/
 │   │   │   │   ├── ChatScreen.kt        # 聊天主屏
@@ -164,7 +162,6 @@ datastore = "1.1.1"
 coil = "2.6.0"
 koin = "3.5.6"
 haze = "0.7.2"
-meshgradient = "0.0.15"
 m3color = "1.0.0"
 capsule = "1.0.1"
 dotlottie = "0.0.9"
@@ -207,7 +204,6 @@ koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
 koin-androidx-compose = { module = "io.insert-koin:koin-androidx-compose", version.ref = "koin" }
 
 haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
-meshgradient = { module = "com.github.om252345:composemeshgradient", version.ref = "meshgradient" }
 m3color = { module = "com.github.kyant0:m3color", version.ref = "m3color" }
 capsule = { module = "com.github.kyant0:capsule", version.ref = "capsule" }
 dotlottie-android = { module = "com.github.lottiefiles:dotlottie-android", version.ref = "dotlottie" }
@@ -299,7 +295,6 @@ dependencies {
     implementation(libs.koin.androidx.compose)
 
     implementation(libs.haze)
-    implementation(libs.meshgradient)
     implementation(libs.m3color)
     implementation(libs.capsule)
     implementation(libs.dotlottie.android)
@@ -405,7 +400,7 @@ git commit -m "feat: 初始化安卓项目骨架
 
 - Gradle Kotlin DSL 配置 + 版本目录
 - 引入 Compose/Material3/Ktor/Room/DataStore/Koin 依赖
-- 引入 QZ 风格视觉依赖(Haze/MeshGradient/M3Color/Capsule/dotlottie)
+- 引入 QZ 风格视觉依赖(Haze/M3Color/Capsule/dotlottie)
 - AgentApplication + Koin 初始化
 - AndroidManifest 声明 INTERNET 权限
 
@@ -512,19 +507,17 @@ Author: ThinkReally114"
 
 **Files:**
 - Create: `app/src/main/java/com/qz/agent/ui/theme/ColorSchemes.kt`
-- Create: `app/src/main/java/com/qz/agent/ui/theme/Gradients.kt`
 - Create: `app/src/main/java/com/qz/agent/ui/theme/Shapes.kt`
 - Create: `app/src/main/java/com/qz/agent/ui/theme/Type.kt`
 - Create: `app/src/main/java/com/qz/agent/ui/theme/Theme.kt`
 
-- [ ] **Step 1: 创建 `ColorSchemes.kt` - 预设主题色板**
+- [ ] **Step 1: 创建 `ColorSchemes.kt` - 预设主题色板（含纯色背景）**
 
 ```kotlin
 package com.qz.agent.ui.theme
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import com.qz.agent.domain.model.PresetTheme
 
@@ -603,53 +596,7 @@ object ColorSchemes {
 }
 ```
 
-- [ ] **Step 2: 创建 `Gradients.kt` - 网格渐变背景定义**
-
-```kotlin
-package com.qz.agent.ui.theme
-
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
-import com.qz.agent.domain.model.PresetTheme
-
-object Gradients {
-    data class GradientStops(
-        val colors: List<Color>,
-        val stops: List<Float>
-    )
-
-    val QzPurple = GradientStops(
-        colors = listOf(Color(0xFF1A1B2E), Color(0xFF2D1B4E), Color(0xFF1B3A4E), Color(0xFF0F0F1E)),
-        stops = listOf(0f, 0.4f, 0.75f, 1f)
-    )
-    val DeepSpace = GradientStops(
-        colors = listOf(Color(0xFF050A14), Color(0xFF0C2740), Color(0xFF1B3A4E), Color(0xFF0A1428)),
-        stops = listOf(0f, 0.35f, 0.7f, 1f)
-    )
-    val AuroraGreen = GradientStops(
-        colors = listOf(Color(0xFF0A1410), Color(0xFF0F2E26), Color(0xFF1B3A4E), Color(0xFF0F1A14)),
-        stops = listOf(0f, 0.4f, 0.75f, 1f)
-    )
-    val WarmOrange = GradientStops(
-        colors = listOf(Color(0xFF1A0F0A), Color(0xFF3D1F00), Color(0xFF3D1F1F), Color(0xFF241410)),
-        stops = listOf(0f, 0.4f, 0.75f, 1f)
-    )
-
-    fun forTheme(theme: PresetTheme): GradientStops = when (theme) {
-        PresetTheme.QZ_PURPLE -> QzPurple
-        PresetTheme.DEEP_SPACE -> DeepSpace
-        PresetTheme.AURORA_GREEN -> AuroraGreen
-        PresetTheme.WARM_ORANGE -> WarmOrange
-    }
-
-    fun toBrush(stops: GradientStops): Brush = Brush.linearGradient(
-        colors = stops.colors,
-        stops = stops.stops
-    )
-}
-```
-
-- [ ] **Step 3: 创建 `Shapes.kt` - 胶囊形状定义**
+- [ ] **Step 2: 创建 `Shapes.kt` - 胶囊形状定义**
 
 ```kotlin
 package com.qz.agent.ui.theme
@@ -669,7 +616,7 @@ val QzShapes = Shapes(
 val CapsuleShape = RoundedCornerShape(50)
 ```
 
-- [ ] **Step 4: 创建 `Type.kt` - 字体**
+- [ ] **Step 3: 创建 `Type.kt` - 字体**
 
 ```kotlin
 package com.qz.agent.ui.theme
@@ -709,24 +656,17 @@ val CodeTextStyle = TextStyle(
 )
 ```
 
-- [ ] **Step 5: 创建 `Theme.kt` - 主题入口**
+- [ ] **Step 4: 创建 `Theme.kt` - 主题入口（纯色背景）**
 
 ```kotlin
 package com.qz.agent.ui.theme
 
-import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import com.qz.agent.domain.model.PresetTheme
-
-val LocalGradientBackground = staticCompositionLocalOf<Brush> {
-    error("No gradient background provided")
-}
 
 @Composable
 fun QZAgentTheme(
@@ -734,102 +674,44 @@ fun QZAgentTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = ColorSchemes.forTheme(theme)
-    val gradientStops = Gradients.forTheme(theme)
-    val gradientBrush = Gradients.toBrush(gradientStops)
 
-    CompositionLocalProvider(LocalGradientBackground provides gradientBrush) {
-        MaterialTheme(
-            colorScheme = colorScheme,
-            typography = QzTypography,
-            shapes = QzShapes,
-            content = {
-                Surface(
-                    modifier = Modifier.background(gradientBrush),
-                    color = androidx.compose.ui.graphics.Color.Transparent,
-                    content = content
-                )
-            }
-        )
-    }
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = QzTypography,
+        shapes = QzShapes,
+        content = {
+            Surface(
+                modifier = Modifier,
+                color = colorScheme.background,
+                content = content
+            )
+        }
+    )
 }
 ```
 
-- [ ] **Step 6: 验证编译通过**
+- [ ] **Step 5: 验证编译通过**
 
 Run: `./gradlew assembleDebug`
 Expected: BUILD SUCCESSFUL
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add app/src/main/java/com/qz/agent/ui/theme/
 git commit -m "feat: 实现 QZ 风格主题系统
 
 - 4 个预设主题色板(紫/蓝/绿/橙)深色优先
-- 网格渐变背景定义(每主题对应渐变)
+- 每主题预设纯色背景(无渐变)
 - 胶囊形状 + 字体配置
-- QZAgentTheme 主题入口,提供 LocalGradientBackground
+- QZAgentTheme 主题入口,Surface 用 colorScheme.background
 
 Author: ThinkReally114"
 ```
 
 ---
 
-## Task 4: 网格渐变背景组件
-
-**Files:**
-- Create: `app/src/main/java/com/qz/agent/ui/components/GradientBackground.kt`
-
-- [ ] **Step 1: 创建 `GradientBackground.kt`**
-
-```kotlin
-package com.qz.agent.ui.components
-
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BrushDrawScope
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
-import com.qz.agent.ui.theme.LocalGradientBackground
-
-@Composable
-fun GradientBackground(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    val backgroundBrush = LocalGradientBackground.current
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(backgroundBrush)
-    ) {
-        content()
-    }
-}
-```
-
-- [ ] **Step 2: Commit**
-
-```bash
-git add app/src/main/java/com/qz/agent/ui/components/GradientBackground.kt
-git commit -m "feat: 添加网格渐变背景组件
-
-- 使用 LocalGradientBackground 提供的画笔
-- 作为所有屏幕的基础背景容器
-
-Author: ThinkReally114"
-```
-
----
-
-## Task 5: 胶囊按钮与消息气泡组件
+## Task 4: 胶囊按钮与消息气泡组件
 
 **Files:**
 - Create: `app/src/main/java/com/qz/agent/ui/components/CapsuleButton.kt`
@@ -1040,7 +922,7 @@ Author: ThinkReally114"
 
 ---
 
-## Task 6: 聊天输入框组件
+## Task 5: 聊天输入框组件
 
 **Files:**
 - Create: `app/src/main/java/com/qz/agent/ui/components/ChatInput.kt`
@@ -1160,7 +1042,7 @@ Author: ThinkReally114"
 
 ---
 
-## Task 7: 数据层 - Room 数据库与 DAO
+## Task 6: 数据层 - Room 数据库与 DAO
 
 **Files:**
 - Create: `app/src/main/java/com/qz/agent/data/local/entity/SessionEntity.kt`
@@ -1324,7 +1206,7 @@ Author: ThinkReally114"
 
 ---
 
-## Task 8: API Key 加密存储
+## Task 7: API Key 加密存储
 
 **Files:**
 - Create: `app/src/main/java/com/qz/agent/data/datastore/ApiKeyStore.kt`
@@ -1387,7 +1269,7 @@ Author: ThinkReally114"
 
 ---
 
-## Task 9: LLM 客户端 - DTO 与 SSE 解析器
+## Task 8: LLM 客户端 - DTO 与 SSE 解析器
 
 **Files:**
 - Create: `app/src/main/java/com/qz/agent/llm/model/ChatRequest.kt`
@@ -1511,7 +1393,7 @@ Author: ThinkReally114"
 
 ---
 
-## Task 10: LLM 客户端接口与 Zen 实现
+## Task 9: LLM 客户端接口与 Zen 实现
 
 **Files:**
 - Create: `app/src/main/java/com/qz/agent/llm/ZenConfig.kt`
@@ -1629,7 +1511,7 @@ Author: ThinkReally114"
 
 ---
 
-## Task 11: 依赖注入模块
+## Task 10: 依赖注入模块
 
 **Files:**
 - Modify: `app/src/main/java/com/qz/agent/di/AppModule.kt`
@@ -1727,7 +1609,7 @@ Author: ThinkReally114"
 
 ---
 
-## Task 12: 聊天 ViewModel 与发送消息用例
+## Task 11: 聊天 ViewModel 与发送消息用例
 
 **Files:**
 - Create: `app/src/main/java/com/qz/agent/domain/usecase/SendMessageUseCase.kt`
@@ -1852,7 +1734,7 @@ Author: ThinkReally114"
 
 ---
 
-## Task 13: 聊天主屏与 MainActivity
+## Task 12: 聊天主屏与 MainActivity
 
 **Files:**
 - Create: `app/src/main/java/com/qz/agent/ui/chat/ChatScreen.kt`
@@ -1883,7 +1765,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.qz.agent.ui.components.ChatInput
-import com.qz.agent.ui.components.GradientBackground
 import com.qz.agent.ui.components.MessageBubble
 import org.koin.androidx.compose.koinViewModel
 
@@ -1902,37 +1783,35 @@ fun ChatScreen(
         }
     }
 
-    GradientBackground {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("QZ Agent") },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = androidx.compose.ui.graphics.Color.Transparent
-                    )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("QZ Agent") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = androidx.compose.ui.graphics.Color.Transparent
                 )
-            },
-            containerColor = androidx.compose.ui.graphics.Color.Transparent
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
+            )
+        },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    items(messages) { msg ->
-                        MessageBubble(message = msg)
-                    }
+                items(messages) { msg ->
+                    MessageBubble(message = msg)
                 }
-                ChatInput(
-                    onSend = { viewModel.sendUserMessage(it) },
-                    enabled = !isStreaming
-                )
             }
+            ChatInput(
+                onSend = { viewModel.sendUserMessage(it) },
+                enabled = !isStreaming
+            )
         }
     }
 }
@@ -1980,7 +1859,7 @@ git add app/src/main/java/com/qz/agent/ui/chat/ChatScreen.kt app/src/main/java/c
 git commit -m "feat: 实现聊天主屏与 MainActivity 入口
 
 - ChatScreen: LazyColumn 消息列表 + ChatInput
-  - 渐变背景容器 + 透明 Scaffold
+  - 透明 Scaffold 透出主题背景色
   - 新消息自动滚动到底
   - 流式时禁用输入
 - MainActivity: 入口,套用 QZAgentTheme
@@ -1990,7 +1869,7 @@ Author: ThinkReally114"
 
 ---
 
-## Task 14: 设置页 - API Key 输入与主题切换
+## Task 13: 设置页 - API Key 输入与主题切换
 
 **Files:**
 - Create: `app/src/main/java/com/qz/agent/ui/settings/SettingsViewModel.kt`
@@ -2062,7 +1941,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.qz.agent.domain.model.PresetTheme
 import com.qz.agent.ui.components.CapsuleButton
-import com.qz.agent.ui.components.GradientBackground
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2076,54 +1954,52 @@ fun SettingsScreen(
     val selectedTheme by viewModel.selectedTheme.collectAsState()
     var keyInput by remember { mutableStateOf(zenKey) }
 
-    GradientBackground {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("设置") },
-                    navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
-                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                        containerColor = androidx.compose.ui.graphics.Color.Transparent
-                    )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("设置") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                    containerColor = androidx.compose.ui.graphics.Color.Transparent
                 )
-            },
-            containerColor = androidx.compose.ui.graphics.Color.Transparent
-        ) { padding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text("OpenCode Zen API Key", style = MaterialTheme.typography.titleLarge)
-                OutlinedTextField(
-                    value = keyInput,
-                    onValueChange = { keyInput = it },
-                    label = { Text("Zen API Key") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                CapsuleButton(
-                    text = "保存",
-                    onClick = { viewModel.setZenApiKey(keyInput) },
-                    isPrimary = true
-                )
+            )
+        },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text("OpenCode Zen API Key", style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(
+                value = keyInput,
+                onValueChange = { keyInput = it },
+                label = { Text("Zen API Key") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            CapsuleButton(
+                text = "保存",
+                onClick = { viewModel.setZenApiKey(keyInput) },
+                isPrimary = true
+            )
 
-                Text("主题", style = MaterialTheme.typography.titleLarge)
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    PresetTheme.values().forEach { theme ->
-                        CapsuleButton(
-                            text = theme.displayName,
-                            onClick = {
-                                viewModel.setTheme(theme)
-                                onThemeChanged(theme)
-                            },
-                            isPrimary = theme == selectedTheme
-                        )
-                    }
+            Text("主题", style = MaterialTheme.typography.titleLarge)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PresetTheme.values().forEach { theme ->
+                    CapsuleButton(
+                        text = theme.displayName,
+                        onClick = {
+                            viewModel.setTheme(theme)
+                            onThemeChanged(theme)
+                        },
+                        isPrimary = theme == selectedTheme
+                    )
                 }
             }
         }
@@ -2229,38 +2105,36 @@ fun ChatScreen(
         }
     }
 
-    GradientBackground {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("QZ Agent") },
-                    actions = {
-                        androidx.compose.material3.TextButton(onClick = onOpenSettings) {
-                            Text("设置")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = androidx.compose.ui.graphics.Color.Transparent
-                    )
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("QZ Agent") },
+                actions = {
+                    androidx.compose.material3.TextButton(onClick = onOpenSettings) {
+                        Text("设置")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = androidx.compose.ui.graphics.Color.Transparent
                 )
-            },
-            containerColor = androidx.compose.ui.graphics.Color.Transparent
-        ) { padding ->
-            Column(
-                modifier = Modifier.fillMaxSize().padding(padding)
+            )
+        },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent
+    ) { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    items(messages) { msg -> MessageBubble(message = msg) }
-                }
-                ChatInput(
-                    onSend = { viewModel.sendUserMessage(it) },
-                    enabled = !isStreaming
-                )
+                items(messages) { msg -> MessageBubble(message = msg) }
             }
+            ChatInput(
+                onSend = { viewModel.sendUserMessage(it) },
+                enabled = !isStreaming
+            )
         }
     }
 }
@@ -2288,7 +2162,7 @@ Author: ThinkReally114"
 
 ---
 
-## Task 15: 端到端验证
+## Task 14: 端到端验证
 
 **Files:**
 - None (manual verification)
@@ -2300,12 +2174,12 @@ Expected: 无报错，依赖全部解析。
 - [ ] **Step 2: 运行到模拟器/真机**
 
 Run: `./gradlew installDebug` 或 Android Studio Run
-Expected: app 启动，显示 QZ 紫色渐变背景 + 顶部 "QZ Agent" 标题 + 设置按钮 + 空消息列表 + 底部胶囊输入框。
+Expected: app 启动，显示 QZ 紫色背景 + 顶部 "QZ Agent" 标题 + 设置按钮 + 空消息列表 + 底部胶囊输入框。
 
 - [ ] **Step 3: 切换主题**
 
 点设置 → 选「深空蓝」「极光绿」「暖橙」 → 返回聊天。
-Expected: 背景渐变和主色实时变化。
+Expected: 背景色和主色实时变化。
 
 - [ ] **Step 4: 输入 Zen API Key**
 
@@ -2341,26 +2215,26 @@ Author: ThinkReally114"
 ## 后续计划（本计划未覆盖，下一阶段处理）
 
 以下模块在设计文档中定义，但本计划未实现，留待后续计划：
-- Task 4: 代码查看器 + 划选评论交互（CodeViewer + CommentSheet）
-- Task 5: 代码块渲染 + Markdown 渲染
-- Task 6: 毛玻璃效果（Haze 集成）
-- Task 7: Agent 引擎（Agent Loop + 工具调度 + 权限网关）
-- Task 8: 规则系统（rule.md 解析）
-- Task 9: 权限系统（工具级开关 + 运行时授权）
-- Task 10: 扩展生态层（MCP Client + Skills 加载器 + LSP Client）
-- Task 11: Exa MCP 联网工具
-- Task 12: 内置工具（文件读写 + Git + 代码沙箱）
-- Task 13: 上下文压缩（checkpoint + 重建）
-- Task 14: 会话列表页
-- Task 15: 5 个内置 skills（explain/review/comment/refactor/test-gen）
+- 代码查看器 + 划选评论交互（CodeViewer + CommentSheet）
+- 代码块渲染 + Markdown 渲染
+- 毛玻璃效果（Haze 集成）
+- Agent 引擎（Agent Loop + 工具调度 + 权限网关）
+- 规则系统（rule.md 解析）
+- 权限系统（工具级开关 + 运行时授权）
+- 扩展生态层（MCP Client + Skills 加载器 + LSP Client）
+- Exa MCP 联网工具
+- 内置工具（文件读写 + Git + 代码沙箱）
+- 上下文压缩（checkpoint + 重建）
+- 会话列表页
+- 5 个内置 skills（explain/review/comment/refactor/test-gen）
 
 ## 自审
 
 **Spec 覆盖检查：**
-- ✅ UI 层（Task 3-6, 12-14）：主题系统、渐变背景、胶囊组件、消息气泡、聊天输入、设置页
-- ✅ LLM 客户端（Task 9-10）：DTO、SSE 解析、Zen API 流式调用
-- ✅ 数据层基础（Task 7-8）：Room + DAO、API key 加密存储
-- ✅ 端到端验证（Task 15）
+- ✅ UI 层（Task 3-5, 12-13）：主题系统、纯色背景、胶囊组件、消息气泡、聊天输入、设置页
+- ✅ LLM 客户端（Task 8-9）：DTO、SSE 解析、Zen API 流式调用
+- ✅ 数据层基础（Task 6-7）：Room + DAO、API key 加密存储
+- ✅ 端到端验证（Task 14）
 - ⏸ Agent 引擎/规则/权限/扩展/skills/上下文压缩：留待后续计划
 
 **占位符扫描：** 无 TBD/TODO，所有代码完整。
