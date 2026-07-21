@@ -1,5 +1,6 @@
 package com.forgeidea.llm.model
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -24,7 +25,7 @@ data class ChatMessage(
 
 @Serializable
 data class ToolDefinition(
-    val type: String = "function",
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS) val type: String = "function",
     val function: ToolFunction
 )
 

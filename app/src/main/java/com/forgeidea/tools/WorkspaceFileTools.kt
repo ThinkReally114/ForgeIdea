@@ -105,20 +105,24 @@ class WorkspaceFileTools(private val context: Context) {
     )
 
     suspend fun executeTool(sessionId: String, name: String, arguments: String): String {
-        val args = Json.parseToJsonElement(arguments)
-        val obj = args as? JsonObject ?: throw IllegalArgumentException("参数必须是 JSON 对象")
-        return when (name) {
-            "write_file" -> {
-                val path = obj["path"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("缺少 path")
-                val content = obj["content"]?.jsonPrimitive?.content ?: ""
-                writeFile(sessionId, path, content)
+        return try {
+            val args = Json.parseToJsonElement(arguments)
+            val obj = args as? JsonObject ?: return "错误：参数必须是 JSON 对象"
+            when (name) {
+                "write_file" -> {
+                    val path = obj["path"]?.jsonPrimitive?.content ?: return "错误：缺少 path 参数"
+                    val content = obj["content"]?.jsonPrimitive?.content ?: ""
+                    writeFile(sessionId, path, content)
+                }
+                "read_file" -> {
+                    val path = obj["path"]?.jsonPrimitive?.content ?: return "错误：缺少 path 参数"
+                    readFile(sessionId, path)
+                }
+                "list_files" -> listFiles(sessionId).joinToString("\n").ifBlank { "工作区为空" }
+                else -> "错误：未知工具 $name"
             }
-            "read_file" -> {
-                val path = obj["path"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("缺少 path")
-                readFile(sessionId, path)
-            }
-            "list_files" -> listFiles(sessionId).joinToString("\n").ifBlank { "工作区为空" }
-            else -> throw IllegalArgumentException("未知工具: $name")
+        } catch (e: Exception) {
+            "错误：${e.message ?: "执行工具失败"}"
         }
     }
 }
