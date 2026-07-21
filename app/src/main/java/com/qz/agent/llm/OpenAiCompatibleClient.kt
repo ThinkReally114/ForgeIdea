@@ -42,7 +42,7 @@ class OpenAiCompatibleClient(
         val channel = response.bodyAsChannel()
         val buffer = StringBuilder()
         while (!channel.isClosedForRead) {
-            val line = channel.readUTF8Line() ?: break
+            val line = channel.readUTF8Line(limit = 4096) ?: break
             val chunk = sseParser.parse(line)
             if (chunk != null) {
                 if (chunk.isDone) break
