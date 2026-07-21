@@ -4,16 +4,18 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.forgeidea.data.datastore.ApiKeyStore
+import com.forgeidea.data.local.entity.SessionEntity
+import com.forgeidea.data.repository.ChatRepository
 import com.forgeidea.domain.model.ChatRole
 import com.forgeidea.domain.model.LlmModel
 import com.forgeidea.domain.model.Message
 import com.forgeidea.domain.usecase.SendMessageUseCase
 import com.forgeidea.tools.ExecuteCommandTool
 import com.forgeidea.tools.ToolResult
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -22,6 +24,7 @@ import java.util.UUID
 class ChatViewModel(
     private val sendMessageUseCase: SendMessageUseCase,
     private val apiKeyStore: ApiKeyStore,
+    private val chatRepository: ChatRepository,
     private val executeCommandTool: ExecuteCommandTool
 ) : ViewModel() {
 
@@ -40,8 +43,39 @@ class ChatViewModel(
     private val _models = MutableStateFlow(apiKeyStore.getModels())
     val models: StateFlow<List<LlmModel>> = _models.asStateFlow()
 
+    private val _currentSessionId = MutableStateFlow<String?>(apiKeyStore.getCurrentSessionId())
+    val currentSessionId: StateFlow<String?> = _currentSessionId.asStateFlow()
+
+    private val _sessions = MutableStateFlow<List<SessionEntity>>(emptyList())
+    val sessions: StateFlow<List<SessionEntity>> = _sessions.asStateFlow()
+
+    private var messageObserverJob: Job? = null
+
     init {
         refreshModels()
+        observeSessions()
+        loadCurrentSession()
+    }
+
+    private fun observeSessions() {
+        viewModelScope.launch {
+            chatRepository.observeSessions().collect { sessions ->
+                _sessions.value = sessions
+            }
+        }
+    }
+
+    private fun loadCurrentSession() {
+        messageObserverJob?.cancel()
+        messageObserverJob = viewModelScope.launch {
+            val sessionId = _currentSessionId.value
+                ?: chatRepository.getCurrentOrCreateSession(_selectedModelId.value).also {
+                    _currentSessionId.value = it.id
+                }.id
+            chatRepository.observeMessages(sessionId).collect { msgs ->
+                _messages.value = msgs
+            }
+        }
     }
 
     fun refreshModels() {
@@ -60,85 +94,126 @@ class ChatViewModel(
         apiKeyStore.setSelectedModelId(id)
     }
 
+    fun createNewSession() {
+        viewModelScope.launch {
+            val session = chatRepository.createNewSession(_selectedModelId.value)
+            _currentSessionId.value = session.id
+            _messages.value = emptyList()
+            messageObserverJob?.cancel()
+            messageObserverJob = viewModelScope.launch {
+                chatRepository.observeMessages(session.id).collect { msgs ->
+                    _messages.value = msgs
+                }
+            }
+        }
+    }
+
+    fun switchToSession(id: String) {
+        viewModelScope.launch {
+            val session = chatRepository.switchToSession(id) ?: return@launch
+            _currentSessionId.value = session.id
+            _selectedModelId.value = session.modelId
+            messageObserverJob?.cancel()
+            messageObserverJob = viewModelScope.launch {
+                chatRepository.observeMessages(session.id).collect { msgs ->
+                    _messages.value = msgs
+                }
+            }
+        }
+    }
+
+    fun deleteSession(id: String) {
+        viewModelScope.launch {
+            chatRepository.deleteSession(id)
+            if (_currentSessionId.value == id) {
+                _currentSessionId.value = null
+                loadCurrentSession()
+            }
+        }
+    }
+
     fun sendUserMessage(text: String) {
         if (_isStreaming.value) return
+        val sessionId = _currentSessionId.value ?: return
 
         val userMsg = Message(
             id = UUID.randomUUID().toString(),
-            sessionId = "default",
+            sessionId = sessionId,
             role = ChatRole.USER,
             content = text,
             timestamp = System.currentTimeMillis()
         )
-        _messages.update { it + userMsg }
 
         if (text.startsWith("/exec ")) {
-            val command = text.removePrefix("/exec ")
-            handleCommandExecution(command)
+            viewModelScope.launch {
+                chatRepository.addMessage(sessionId, userMsg)
+            }
+            handleCommandExecution(sessionId, text.removePrefix("/exec "))
             return
         }
 
+        val assistantId = UUID.randomUUID().toString()
         val assistantMsg = Message(
-            id = UUID.randomUUID().toString(),
-            sessionId = "default",
+            id = assistantId,
+            sessionId = sessionId,
             role = ChatRole.ASSISTANT,
             content = "",
             reasoning = "",
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis() + 1
         )
-        _messages.update { it + assistantMsg }
-        _isStreaming.value = true
-        _error.value = null
 
         viewModelScope.launch {
             try {
+                chatRepository.addMessage(sessionId, userMsg)
+                chatRepository.addMessage(sessionId, assistantMsg)
+                _isStreaming.value = true
+                _error.value = null
+
+                val history = _messages.value.filter { it.id != assistantId }
+                var currentContent = ""
+                var currentReasoning = ""
                 sendMessageUseCase(
-                    history = _messages.value.filter { it.id != assistantMsg.id && it.id != userMsg.id },
+                    history = history,
                     userInput = text,
                     model = _selectedModelId.value
                 ).collect { chunk ->
-                    _messages.update { msgs ->
-                        msgs.map {
-                            if (it.id == assistantMsg.id) {
-                                it.copy(
-                                    content = it.content + chunk.content,
-                                    reasoning = it.reasoning + chunk.reasoning
-                                )
-                            } else it
-                        }
-                    }
+                    currentContent += chunk.content
+                    currentReasoning += chunk.reasoning
+                    val updated = assistantMsg.copy(
+                        content = currentContent,
+                        reasoning = currentReasoning
+                    )
+                    chatRepository.updateMessage(sessionId, updated)
                 }
-                val finalAssistant = _messages.value.find { it.id == assistantMsg.id }
-                if (finalAssistant != null && finalAssistant.content.isBlank() && finalAssistant.reasoning.isBlank()) {
-                    _messages.update { msgs ->
-                        msgs.map { if (it.id == assistantMsg.id) it.copy(content = "❌ 没有收到回复内容") else it }
-                    }
+
+                if (currentContent.isBlank() && currentReasoning.isBlank()) {
+                    val errMsg = assistantMsg.copy(content = "❌ 没有收到回复内容")
+                    chatRepository.updateMessage(sessionId, errMsg)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "sendUserMessage failed", e)
                 _error.value = e.message ?: "未知错误"
-                _messages.update { msgs ->
-                    msgs.map { if (it.id == assistantMsg.id) it.copy(content = "❌ ${e.message ?: "请求失败"}") else it }
-                }
+                val errMsg = assistantMsg.copy(content = "❌ ${e.message ?: "请求失败"}")
+                chatRepository.updateMessage(sessionId, errMsg)
             } finally {
                 _isStreaming.value = false
             }
         }
     }
 
-    private fun handleCommandExecution(command: String) {
+    private fun handleCommandExecution(sessionId: String, command: String) {
         _isStreaming.value = true
         val assistantMsg = Message(
             id = UUID.randomUUID().toString(),
-            sessionId = "default",
+            sessionId = sessionId,
             role = ChatRole.ASSISTANT,
             content = "",
             reasoning = "",
             timestamp = System.currentTimeMillis()
         )
-        _messages.update { it + assistantMsg }
         viewModelScope.launch {
             try {
+                chatRepository.addMessage(sessionId, assistantMsg)
                 val args = buildJsonObject { put("command", JsonPrimitive(command)) }
                 val result = executeCommandTool.execute(args)
                 val content = when (result) {
@@ -154,14 +229,11 @@ class ChatViewModel(
                     }
                     is ToolResult.Error -> "❌ ${result.message}"
                 }
-                _messages.update { msgs ->
-                    msgs.map { if (it.id == assistantMsg.id) it.copy(content = content) else it }
-                }
+                chatRepository.updateMessage(sessionId, assistantMsg.copy(content = content))
             } catch (e: Exception) {
                 Log.e(TAG, "handleCommandExecution failed", e)
-                _messages.update { msgs ->
-                    msgs.map { if (it.id == assistantMsg.id) it.copy(content = "❌ ${e.message ?: "执行失败"}") else it }
-                }
+                val errMsg = assistantMsg.copy(content = "❌ ${e.message ?: "执行失败"}")
+                chatRepository.updateMessage(sessionId, errMsg)
             } finally {
                 _isStreaming.value = false
             }

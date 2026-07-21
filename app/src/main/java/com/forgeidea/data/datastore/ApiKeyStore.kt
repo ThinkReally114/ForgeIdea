@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.forgeidea.domain.model.LlmModel
+import com.forgeidea.domain.model.PresetTheme
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -60,6 +61,22 @@ class ApiKeyStore(context: Context) {
         plainPrefs.edit().putString(KEY_SELECTED_MODEL, id).apply()
     }
 
+    fun getTheme(): PresetTheme {
+        val name = plainPrefs.getString(KEY_THEME, null) ?: return PresetTheme.QZ_PURPLE
+        return runCatching { PresetTheme.valueOf(name) }.getOrDefault(PresetTheme.QZ_PURPLE)
+    }
+
+    fun setTheme(theme: PresetTheme) {
+        plainPrefs.edit().putString(KEY_THEME, theme.name).apply()
+    }
+
+    fun getCurrentSessionId(): String? = plainPrefs.getString(KEY_CURRENT_SESSION, null)
+
+    fun setCurrentSessionId(id: String?) {
+        if (id == null) plainPrefs.edit().remove(KEY_CURRENT_SESSION).apply()
+        else plainPrefs.edit().putString(KEY_CURRENT_SESSION, id).apply()
+    }
+
     private fun defaultModels(): List<LlmModel> = listOf(
         LlmModel(id = "opencode/big-pickle", name = "Big Pickle")
     )
@@ -69,5 +86,7 @@ class ApiKeyStore(context: Context) {
         private const val KEY_BASE_URL = "base_url"
         private const val KEY_MODELS = "models"
         private const val KEY_SELECTED_MODEL = "selected_model"
+        private const val KEY_THEME = "theme"
+        private const val KEY_CURRENT_SESSION = "current_session"
     }
 }

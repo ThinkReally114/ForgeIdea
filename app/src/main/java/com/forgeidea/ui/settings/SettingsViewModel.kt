@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import com.forgeidea.data.datastore.ApiKeyStore
 import com.forgeidea.domain.model.LlmModel
 import com.forgeidea.domain.model.PresetTheme
+import com.forgeidea.ui.theme.ThemeViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,7 +12,8 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.viewModelScope
 
 class SettingsViewModel(
-    private val apiKeyStore: ApiKeyStore
+    private val apiKeyStore: ApiKeyStore,
+    private val themeViewModel: ThemeViewModel
 ) : ViewModel() {
 
     private val _apiKey = MutableStateFlow(apiKeyStore.getApiKey() ?: "")
@@ -25,8 +27,7 @@ class SettingsViewModel(
     private val _models = MutableStateFlow(apiKeyStore.getModels())
     val models: StateFlow<List<LlmModel>> = _models.asStateFlow()
 
-    private val _selectedTheme = MutableStateFlow(PresetTheme.QZ_PURPLE)
-    val selectedTheme: StateFlow<PresetTheme> = _selectedTheme.asStateFlow()
+    val selectedTheme: StateFlow<PresetTheme> = themeViewModel.theme
 
     fun setApiKey(key: String) {
         viewModelScope.launch {
@@ -61,6 +62,6 @@ class SettingsViewModel(
     }
 
     fun setTheme(theme: PresetTheme) {
-        _selectedTheme.value = theme
+        themeViewModel.setTheme(theme)
     }
 }

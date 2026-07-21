@@ -143,14 +143,16 @@ fun ChatInput(
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 24.dp, max = 140.dp)
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(rememberScrollState()),
+                    contentAlignment = Alignment.TopStart
                 ) {
                     BasicTextField(
                         value = text,
                         onValueChange = { text = it },
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
                         ),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         enabled = enabled,
@@ -160,8 +162,10 @@ fun ChatInput(
                             if (text.isEmpty()) {
                                 Text(
                                     text = placeholder,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+                                    )
                                 )
                             }
                             innerTextField()
