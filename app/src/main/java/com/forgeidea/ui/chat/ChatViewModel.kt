@@ -12,6 +12,7 @@ import com.forgeidea.domain.model.Provider
 import com.forgeidea.domain.usecase.SendMessageUseCase
 import com.forgeidea.tools.ExecuteCommandTool
 import com.forgeidea.tools.WorkspaceFileTools
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +58,8 @@ class ChatViewModel(
     private val _workspaceFiles = MutableStateFlow<List<String>>(emptyList())
     val workspaceFiles: StateFlow<List<String>> = _workspaceFiles.asStateFlow()
 
+    private var messagesJob: Job? = null
+
     init {
         viewModelScope.launch {
             _currentSessionId.value?.let { loadSession(it) }
@@ -84,7 +87,8 @@ class ChatViewModel(
             _currentSessionId.value = session.id
             _selectedModelId.value = session.modelId.ifBlank { apiKeyStore.getSelectedModelId() }
         }
-        viewModelScope.launch {
+        messagesJob?.cancel()
+        messagesJob = viewModelScope.launch {
             chatRepository.observeMessages(id).collect { list ->
                 _messages.value = list
             }
@@ -204,6 +208,23 @@ class ChatViewModel(
                         )
                     )
                 } else {
+                    val reasoningChunkSize = (fullReasoning.length / 40).coerceAtLeast(1)
+                    var reasoningLength = 0
+                    while (reasoningLength < fullReasoning.length) {
+                        reasoningLength = (reasoningLength + reasoningChunkSize).coerceAtMost(fullReasoning.length)
+                        chatRepository.updateMessage(
+                            sessionId,
+                            assistantMsg.copy(
+                                content = "",
+                                reasoning = fullReasoning.take(reasoningLength),
+                                modelName = modelName,
+                                providerName = provider.name,
+                                durationMs = result.durationMs
+                            )
+                        )
+                        delay(16)
+                    }
+
                     val chunkSize = (fullContent.length / 40).coerceAtLeast(1)
                     var currentLength = 0
                     while (currentLength < fullContent.length) {
@@ -212,7 +233,7 @@ class ChatViewModel(
                             sessionId,
                             assistantMsg.copy(
                                 content = fullContent.take(currentLength),
-                                reasoning = if (currentLength >= fullContent.length) fullReasoning else "",
+                                reasoning = fullReasoning,
                                 modelName = modelName,
                                 providerName = provider.name,
                                 durationMs = result.durationMs
@@ -223,7 +244,6 @@ class ChatViewModel(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "sendUserMessage failed", e)
-                _error.value = e.message ?: "未知错误"
                 val errMsg = assistantMsg.copy(content = "❌ ${e.message ?: "请求失败"}")
                 chatRepository.updateMessage(sessionId, errMsg)
             } finally {
@@ -277,7 +297,7 @@ class ChatViewModel(
     fun createWorkspaceFile(path: String, content: String = "") {
         val sessionId = _currentSessionId.value ?: return
         viewModelScope.launch {
-            workspaceFileTools.createFile(sessionId, path, content)
+            workspaceFileTools.writeFile(sessionId, path, content)
             refreshWorkspaceFiles()
         }
     }

@@ -31,24 +31,17 @@ class WorkspaceFileTools(private val context: Context) {
         return target
     }
 
-    fun createFile(sessionId: String, path: String, content: String): String {
+    fun writeFile(sessionId: String, path: String, content: String): String {
         val file = resolveWorkspaceFile(sessionId, path)
         file.parentFile?.mkdirs()
         file.writeText(content)
-        return "已创建文件: ${file.path}"
+        return "已写入文件: ${file.path}"
     }
 
     fun readFile(sessionId: String, path: String): String {
         val file = resolveWorkspaceFile(sessionId, path)
         if (!file.exists()) throw IOException("文件不存在: $path")
         return file.readText()
-    }
-
-    fun writeFile(sessionId: String, path: String, content: String): String {
-        val file = resolveWorkspaceFile(sessionId, path)
-        file.parentFile?.mkdirs()
-        file.writeText(content)
-        return "已写入文件: ${file.path}"
     }
 
     fun listFiles(sessionId: String): List<String> {
@@ -62,17 +55,17 @@ class WorkspaceFileTools(private val context: Context) {
     fun buildToolDefinitions(): List<ToolDefinition> = listOf(
         ToolDefinition(
             function = ToolFunction(
-                name = "create_file",
-                description = "在工作区中创建新文件，如果目录不存在会自动创建",
+                name = "write_file",
+                description = "在工作区中创建新文件或覆盖已有文件，目录不存在会自动创建。当用户需要代码、文本文件或任何文件操作时优先使用此工具。",
                 parameters = buildJsonObject {
                     putJsonObject("properties") {
                         putJsonObject("path") {
                             put("type", "string")
-                            put("description", "相对工作区的文件路径")
+                            put("description", "相对工作区的文件路径，例如 src/main.kt 或 README.md")
                         }
                         putJsonObject("content") {
                             put("type", "string")
-                            put("description", "文件内容")
+                            put("description", "要写入文件的完整内容")
                         }
                     }
                     putJsonArray("required") {
@@ -85,7 +78,7 @@ class WorkspaceFileTools(private val context: Context) {
         ToolDefinition(
             function = ToolFunction(
                 name = "read_file",
-                description = "读取工作区中文件的内容",
+                description = "读取工作区中已有文件的内容",
                 parameters = buildJsonObject {
                     putJsonObject("properties") {
                         putJsonObject("path") {
@@ -101,23 +94,11 @@ class WorkspaceFileTools(private val context: Context) {
         ),
         ToolDefinition(
             function = ToolFunction(
-                name = "write_file",
-                description = "覆盖写入工作区中的文件",
+                name = "list_files",
+                description = "列出当前工作区中的所有文件和目录",
                 parameters = buildJsonObject {
-                    putJsonObject("properties") {
-                        putJsonObject("path") {
-                            put("type", "string")
-                            put("description", "相对工作区的文件路径")
-                        }
-                        putJsonObject("content") {
-                            put("type", "string")
-                            put("description", "文件内容")
-                        }
-                    }
-                    putJsonArray("required") {
-                        add(JsonPrimitive("path"))
-                        add(JsonPrimitive("content"))
-                    }
+                    put("type", "object")
+                    putJsonObject("properties") {}
                 }
             )
         )
@@ -126,17 +107,17 @@ class WorkspaceFileTools(private val context: Context) {
     suspend fun executeTool(sessionId: String, name: String, arguments: String): String {
         val args = Json.parseToJsonElement(arguments)
         val obj = args as? JsonObject ?: throw IllegalArgumentException("参数必须是 JSON 对象")
-        val path = obj["path"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("缺少 path")
         return when (name) {
-            "create_file" -> {
-                val content = obj["content"]?.jsonPrimitive?.content ?: ""
-                createFile(sessionId, path, content)
-            }
-            "read_file" -> readFile(sessionId, path)
             "write_file" -> {
+                val path = obj["path"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("缺少 path")
                 val content = obj["content"]?.jsonPrimitive?.content ?: ""
                 writeFile(sessionId, path, content)
             }
+            "read_file" -> {
+                val path = obj["path"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("缺少 path")
+                readFile(sessionId, path)
+            }
+            "list_files" -> listFiles(sessionId).joinToString("\n").ifBlank { "工作区为空" }
             else -> throw IllegalArgumentException("未知工具: $name")
         }
     }

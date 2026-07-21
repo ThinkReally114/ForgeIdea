@@ -11,10 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,13 +20,11 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -52,32 +47,13 @@ import com.forgeidea.ui.theme.CapsuleShape
 @Composable
 fun ChatInput(
     onSend: (String) -> Unit,
-    models: List<LlmModel>,
-    providers: List<Provider>,
-    selectedModelId: String,
-    onModelSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String = "Work with ForgeIdea...",
     enabled: Boolean = true
 ) {
     var text by remember { mutableStateOf("") }
-    var showModelDialog by remember { mutableStateOf(false) }
     var showFullScreen by remember { mutableStateOf(false) }
-    val selectedModel = models.find { it.id == selectedModelId } ?: models.firstOrNull()
     val hasText = text.isNotBlank()
-
-    if (showModelDialog) {
-        ModelSelectionDialog(
-            models = models,
-            providers = providers,
-            selectedId = selectedModelId,
-            onSelect = {
-                onModelSelected(it)
-                showModelDialog = false
-            },
-            onDismiss = { showModelDialog = false }
-        )
-    }
 
     if (showFullScreen) {
         FullScreenInputDialog(
@@ -108,20 +84,6 @@ fun ChatInput(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = selectedModel?.name ?: "模型",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .padding(end = 8.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable(enabled = models.isNotEmpty() && enabled) { showModelDialog = true }
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -197,7 +159,7 @@ fun ChatInput(
 }
 
 @Composable
-private fun ModelSelectionDialog(
+fun ModelSelectionDialog(
     models: List<LlmModel>,
     providers: List<Provider>,
     selectedId: String,
@@ -212,7 +174,7 @@ private fun ModelSelectionDialog(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
                 .padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
@@ -224,9 +186,7 @@ private fun ModelSelectionDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("选择模型", style = MaterialTheme.typography.titleLarge)
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "关闭")
-                    }
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, contentDescription = "关闭") }
                 }
                 Column(
                     modifier = Modifier
@@ -240,11 +200,11 @@ private fun ModelSelectionDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
                                 .clickable { onSelect(model.id) },
                             color = if (selected) MaterialTheme.colorScheme.primaryContainer
                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
                         ) {
                             Row(
                                 modifier = Modifier
@@ -302,46 +262,57 @@ private fun FullScreenInputDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
+        Card(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("长文本输入", style = MaterialTheme.typography.titleLarge)
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "关闭")
-                    }
-                }
-                OutlinedTextField(
+                BasicTextField(
                     value = text,
                     onValueChange = { text = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(vertical = 12.dp)
-                        .verticalScroll(rememberScrollState()),
-                    placeholder = { Text("在此输入长内容...") },
-                    textStyle = MaterialTheme.typography.bodyLarge
-                )
-                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    singleLine = false,
+                    maxLines = Int.MAX_VALUE
+                )
+
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(onClick = onDismiss) { Text("取消") }
-                    Button(
-                        onClick = { onConfirm(text) },
-                        enabled = text.isNotBlank(),
-                        modifier = Modifier.padding(start = 12.dp)
-                    ) { Text("确认") }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "取消")
+                    }
+                    IconButton(
+                        onClick = {
+                            onConfirm(text)
+                            onDismiss()
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primary,
+                                CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "确认",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
                 }
             }
         }

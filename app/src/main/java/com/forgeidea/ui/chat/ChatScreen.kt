@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -70,6 +72,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.forgeidea.domain.model.ChatRole
 import com.forgeidea.ui.components.ChatInput
 import com.forgeidea.ui.components.MessageBubble
+import com.forgeidea.ui.components.ModelSelectionDialog
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 
@@ -213,14 +216,52 @@ fun ChatScreen(
                     }
                 }
 
-                ChatInput(
-                    onSend = { viewModel.sendUserMessage(it) },
-                    models = models,
-                    providers = providers,
-                    selectedModelId = selectedModelId,
-                    onModelSelected = { viewModel.selectModel(it) },
-                    enabled = !isStreaming
-                )
+                var showModelDialog by remember { mutableStateOf(false) }
+                val selectedModel = models.find { it.id == selectedModelId } ?: models.firstOrNull()
+
+                if (showModelDialog) {
+                    ModelSelectionDialog(
+                        models = models,
+                        providers = providers,
+                        selectedId = selectedModelId,
+                        onSelect = {
+                            viewModel.selectModel(it)
+                            showModelDialog = false
+                        },
+                        onDismiss = { showModelDialog = false }
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.imePadding()
+                ) {
+                    if (models.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 0.dp),
+                            horizontalArrangement = Arrangement.Start,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = selectedModel?.name ?: "模型",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .clickable(enabled = !isStreaming) { showModelDialog = true }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                    ChatInput(
+                        onSend = { viewModel.sendUserMessage(it) },
+                        enabled = !isStreaming
+                    )
+                }
             }
         }
     }

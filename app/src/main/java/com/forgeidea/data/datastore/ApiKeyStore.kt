@@ -59,7 +59,8 @@ class ApiKeyStore(context: Context) {
 
     fun getProviderForModel(modelId: String): Provider? {
         val model = getModels().find { it.id == modelId } ?: return null
-        return getProviderById(model.providerId)
+        val providerId = model.providerId.takeIf { it.isNotBlank() } ?: "default"
+        return getProviderById(providerId)
             ?: getProviders().firstOrNull()
             ?: migrateLegacyProvider().firstOrNull()
     }
