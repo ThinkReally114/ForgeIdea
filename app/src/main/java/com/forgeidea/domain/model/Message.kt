@@ -11,7 +11,11 @@ data class Message(
     val timestamp: Long,
     val reasoning: String = "",
     val toolCalls: List<ToolCall> = emptyList(),
-    val toolCallId: String? = null
+    val toolCallId: String? = null,
+    val animated: Boolean = false,
+    val modelName: String = "",
+    val providerName: String = "",
+    val durationMs: Long = 0L
 )
 
 @Serializable

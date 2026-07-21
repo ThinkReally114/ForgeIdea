@@ -91,6 +91,10 @@ class ChatRepository(
         messageDao.insert(message.toEntity(sessionId))
     }
 
+    suspend fun markMessageAnimated(messageId: String) {
+        messageDao.updateAnimated(messageId, animated = true)
+    }
+
     private fun MessageEntity.toDomain() = Message(
         id = id,
         sessionId = sessionId,
@@ -98,7 +102,11 @@ class ChatRepository(
         content = content,
         timestamp = timestamp,
         reasoning = reasoning,
-        toolCallId = toolCallId
+        toolCallId = toolCallId,
+        animated = animated,
+        modelName = modelName,
+        providerName = providerName,
+        durationMs = durationMs
     )
 
     private fun Message.toEntity(sid: String) = MessageEntity(
@@ -108,6 +116,10 @@ class ChatRepository(
         content = content,
         timestamp = timestamp,
         reasoning = reasoning,
-        toolCallId = toolCallId
+        toolCallId = toolCallId,
+        animated = animated,
+        modelName = modelName,
+        providerName = providerName,
+        durationMs = durationMs
     )
 }

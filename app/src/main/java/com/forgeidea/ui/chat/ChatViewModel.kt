@@ -9,6 +9,7 @@ import com.forgeidea.data.repository.ChatRepository
 import com.forgeidea.domain.model.ChatRole
 import com.forgeidea.domain.model.LlmModel
 import com.forgeidea.domain.model.Message
+import com.forgeidea.domain.model.Provider
 import com.forgeidea.domain.usecase.SendMessageUseCase
 import com.forgeidea.tools.ExecuteCommandTool
 import com.forgeidea.tools.ToolResult
@@ -42,6 +43,9 @@ class ChatViewModel(
 
     private val _models = MutableStateFlow(apiKeyStore.getModels())
     val models: StateFlow<List<LlmModel>> = _models.asStateFlow()
+
+    private val _providers = MutableStateFlow(apiKeyStore.getProviders())
+    val providers: StateFlow<List<Provider>> = _providers.asStateFlow()
 
     private val _currentSessionId = MutableStateFlow<String?>(apiKeyStore.getCurrentSessionId())
     val currentSessionId: StateFlow<String?> = _currentSessionId.asStateFlow()
@@ -91,6 +95,7 @@ class ChatViewModel(
     fun refreshModels() {
         val currentModels = apiKeyStore.getModels()
         _models.value = currentModels
+        _providers.value = apiKeyStore.getProviders()
         val currentId = _selectedModelId.value
         if (currentModels.none { it.id == currentId }) {
             val fallback = currentModels.firstOrNull()?.id ?: ""
@@ -158,6 +163,13 @@ class ChatViewModel(
     fun sendUserMessage(text: String) {
         if (_isStreaming.value) return
         val sessionId = _currentSessionId.value ?: return
+        val modelId = _selectedModelId.value
+        val provider = apiKeyStore.getProviderForModel(modelId)
+        if (provider == null) {
+            _error.value = "未找到模型对应的服务商，请先配置"
+            return
+        }
+        val modelName = _models.value.find { it.id == modelId }?.name ?: modelId
 
         val userMsg = Message(
             id = UUID.randomUUID().toString(),
@@ -195,10 +207,12 @@ class ChatViewModel(
                 val history = _messages.value.filter { it.id != assistantId }
                 var currentContent = ""
                 var currentReasoning = ""
+                val startTime = System.currentTimeMillis()
                 sendMessageUseCase(
                     history = history,
                     userInput = text,
-                    model = _selectedModelId.value
+                    model = modelId,
+                    provider = provider
                 ).collect { chunk ->
                     currentContent += chunk.content
                     currentReasoning += chunk.reasoning
@@ -209,14 +223,35 @@ class ChatViewModel(
                     chatRepository.updateMessage(sessionId, updated)
                 }
 
+                val durationMs = System.currentTimeMillis() - startTime
                 if (currentContent.isBlank() && currentReasoning.isBlank()) {
-                    val errMsg = assistantMsg.copy(content = "❌ 没有收到回复内容")
+                    val errMsg = assistantMsg.copy(
+                        content = "❌ 没有收到回复内容",
+                        modelName = modelName,
+                        providerName = provider.name,
+                        durationMs = durationMs
+                    )
                     chatRepository.updateMessage(sessionId, errMsg)
+                } else {
+                    val finalMsg = assistantMsg.copy(
+                        content = currentContent,
+                        reasoning = currentReasoning,
+                        modelName = modelName,
+                        providerName = provider.name,
+                        durationMs = durationMs
+                    )
+                    chatRepository.updateMessage(sessionId, finalMsg)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "sendUserMessage failed", e)
                 _error.value = e.message ?: "未知错误"
-                val errMsg = assistantMsg.copy(content = "❌ ${e.message ?: "请求失败"}")
+                val durationMs = System.currentTimeMillis() - (assistantMsg.timestamp - 1)
+                val errMsg = assistantMsg.copy(
+                    content = "❌ ${e.message ?: "请求失败"}",
+                    modelName = modelName,
+                    providerName = provider.name,
+                    durationMs = durationMs
+                )
                 chatRepository.updateMessage(sessionId, errMsg)
             } finally {
                 _isStreaming.value = false
@@ -260,6 +295,12 @@ class ChatViewModel(
             } finally {
                 _isStreaming.value = false
             }
+        }
+    }
+
+    fun markMessageAnimated(messageId: String) {
+        viewModelScope.launch {
+            chatRepository.markMessageAnimated(messageId)
         }
     }
 

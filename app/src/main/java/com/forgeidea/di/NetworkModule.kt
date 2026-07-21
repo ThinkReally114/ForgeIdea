@@ -33,7 +33,6 @@ val networkModule = module {
     single<LlmClient> {
         OpenAiCompatibleClient(
             httpClient = get(),
-            keyStore = get(),
             sseParser = get()
         )
     }

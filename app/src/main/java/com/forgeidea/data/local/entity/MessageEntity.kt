@@ -24,5 +24,9 @@ data class MessageEntity(
     val content: String,
     val timestamp: Long,
     val reasoning: String = "",
-    val toolCallId: String?
+    val toolCallId: String?,
+    val animated: Boolean = false,
+    val modelName: String = "",
+    val providerName: String = "",
+    val durationMs: Long = 0L
 )

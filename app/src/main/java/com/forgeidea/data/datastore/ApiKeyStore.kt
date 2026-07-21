@@ -6,6 +6,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.forgeidea.domain.model.LlmModel
 import com.forgeidea.domain.model.PresetTheme
+import com.forgeidea.domain.model.Provider
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -38,10 +39,36 @@ class ApiKeyStore(context: Context) {
         else prefs.edit().putString(KEY_BASE_URL, url).apply()
     }
 
+    fun getProviders(): List<Provider> {
+        val json = prefs.getString(KEY_PROVIDERS, null)
+        val providers = if (json == null) emptyList() else try {
+            Json.decodeFromString<List<Provider>>(json)
+        } catch (e: Exception) {
+            emptyList()
+        }
+        return if (providers.isEmpty()) {
+            migrateLegacyProvider()
+        } else providers
+    }
+
+    fun setProviders(providers: List<Provider>) {
+        prefs.edit().putString(KEY_PROVIDERS, Json.encodeToString(providers)).apply()
+    }
+
+    fun getProviderById(id: String): Provider? = getProviders().find { it.id == id }
+
+    fun getProviderForModel(modelId: String): Provider? {
+        val model = getModels().find { it.id == modelId } ?: return null
+        return getProviderById(model.providerId)
+            ?: getProviders().firstOrNull()
+            ?: migrateLegacyProvider().firstOrNull()
+    }
+
     fun getModels(): List<LlmModel> {
         val json = plainPrefs.getString(KEY_MODELS, null) ?: return defaultModels()
         return try {
-            Json.decodeFromString(json)
+            val models = Json.decodeFromString<List<LlmModel>>(json)
+            migrateModelProviderIds(models)
         } catch (e: Exception) {
             defaultModels()
         }
@@ -77,13 +104,40 @@ class ApiKeyStore(context: Context) {
         else plainPrefs.edit().putString(KEY_CURRENT_SESSION, id).apply()
     }
 
+    private fun migrateLegacyProvider(): List<Provider> {
+        val baseUrl = getBaseUrl() ?: "https://api.opencode.ai/v1"
+        val provider = Provider(
+            id = "default",
+            name = "默认服务商",
+            baseUrl = baseUrl,
+            apiKey = getApiKey() ?: ""
+        )
+        val list = listOf(provider)
+        setProviders(list)
+        return list
+    }
+
+    private fun migrateModelProviderIds(models: List<LlmModel>): List<LlmModel> {
+        val providers = getProviders()
+        val defaultProviderId = providers.firstOrNull()?.id ?: ""
+        if (defaultProviderId.isBlank() || models.all { it.providerId.isNotBlank() }) {
+            return models
+        }
+        val migrated = models.map {
+            if (it.providerId.isBlank()) it.copy(providerId = defaultProviderId) else it
+        }
+        setModels(migrated)
+        return migrated
+    }
+
     private fun defaultModels(): List<LlmModel> = listOf(
-        LlmModel(id = "opencode/big-pickle", name = "Big Pickle")
+        LlmModel(id = "opencode/big-pickle", name = "Big Pickle", providerId = "")
     )
 
     companion object {
         private const val KEY_API_KEY = "api_key"
         private const val KEY_BASE_URL = "base_url"
+        private const val KEY_PROVIDERS = "providers"
         private const val KEY_MODELS = "models"
         private const val KEY_SELECTED_MODEL = "selected_model"
         private const val KEY_THEME = "theme"

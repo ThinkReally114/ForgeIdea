@@ -20,4 +20,7 @@ interface MessageDao {
 
     @Query("SELECT COUNT(*) FROM messages WHERE sessionId = :sessionId")
     suspend fun countBySession(sessionId: String): Int
+
+    @Query("UPDATE messages SET animated = :animated WHERE id = :messageId")
+    suspend fun updateAnimated(messageId: String, animated: Boolean)
 }

@@ -1,5 +1,6 @@
 package com.forgeidea.domain.usecase
 
+import com.forgeidea.domain.model.Provider
 import com.forgeidea.llm.LlmClient
 import com.forgeidea.llm.model.ChatMessage
 import com.forgeidea.llm.model.StreamChunk
@@ -11,11 +12,12 @@ class SendMessageUseCase(
     operator fun invoke(
         history: List<com.forgeidea.domain.model.Message>,
         userInput: String,
-        model: String
+        model: String,
+        provider: Provider
     ): Flow<StreamChunk> {
         val chatMessages = history.map { msg ->
             ChatMessage(role = msg.role.name.lowercase(), content = msg.content)
         } + ChatMessage(role = "user", content = userInput)
-        return llmClient.streamChat(chatMessages, model)
+        return llmClient.streamChat(chatMessages, model, provider)
     }
 }

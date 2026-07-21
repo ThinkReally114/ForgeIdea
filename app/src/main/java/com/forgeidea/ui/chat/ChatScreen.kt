@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -53,6 +55,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
+import java.util.UUID
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -70,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import com.forgeidea.domain.model.ChatRole
 import com.forgeidea.domain.model.LlmModel
 import com.forgeidea.domain.model.PresetTheme
+import com.forgeidea.domain.model.Provider
 import com.forgeidea.ui.components.CapsuleButton
 import com.forgeidea.ui.components.ChatInput
 import com.forgeidea.ui.components.MessageBubble
@@ -88,6 +92,7 @@ fun ChatScreen(
     val isStreaming by viewModel.isStreaming.collectAsState()
     val selectedModelId by viewModel.selectedModelId.collectAsState()
     val models by viewModel.models.collectAsState()
+    val providers by viewModel.providers.collectAsState()
     val sessions by viewModel.sessions.collectAsState()
     val currentSessionId by viewModel.currentSessionId.collectAsState()
     val currentSessionTitle by viewModel.currentSessionTitle.collectAsState()
@@ -168,12 +173,17 @@ fun ChatScreen(
                     val lastMessage = messages.lastOrNull()
                     items(messages, key = { it.id }) { msg ->
                         val loading = msg.id == lastMessage?.id && isStreaming && msg.role != ChatRole.USER
-                        MessageBubble(message = msg, isLoading = loading)
+                        MessageBubble(
+                            message = msg,
+                            isLoading = loading,
+                            onAnimated = { viewModel.markMessageAnimated(it) }
+                        )
                     }
                 }
                 ChatInput(
                     onSend = { viewModel.sendUserMessage(it) },
                     models = models,
+                    providers = providers,
                     selectedModelId = selectedModelId,
                     onModelSelected = { viewModel.selectModel(it) },
                     enabled = !isStreaming
@@ -255,12 +265,15 @@ private fun DrawerSettingsSection(
     val apiKey by viewModel.apiKey.collectAsState()
     val baseUrl by viewModel.baseUrl.collectAsState()
     val models by viewModel.models.collectAsState()
+    val providers by viewModel.providers.collectAsState()
     val selectedTheme by viewModel.selectedTheme.collectAsState()
 
     var keyInput by remember { mutableStateOf(apiKey) }
     var urlInput by remember { mutableStateOf(baseUrl) }
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showAddModelDialog by remember { mutableStateOf(false) }
     var editingModel by remember { mutableStateOf<LlmModel?>(null) }
+    var showAddProviderDialog by remember { mutableStateOf(false) }
+    var editingProvider by remember { mutableStateOf<Provider?>(null) }
 
     Row(
         modifier = Modifier
@@ -312,6 +325,28 @@ private fun DrawerSettingsSection(
                 isPrimary = true
             )
 
+            Text("服务商", style = MaterialTheme.typography.titleSmall)
+            providers.forEach { provider ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(provider.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(provider.baseUrl, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = { editingProvider = provider }) { Text("编辑") }
+                    if (provider.id != "default") {
+                        TextButton(onClick = { viewModel.removeProvider(provider.id) }) { Text("删除") }
+                    }
+                }
+            }
+            CapsuleButton(
+                text = "添加服务商",
+                onClick = { showAddProviderDialog = true }
+            )
+
             Text("模型", style = MaterialTheme.typography.titleSmall)
             models.forEach { model ->
                 Row(
@@ -322,6 +357,10 @@ private fun DrawerSettingsSection(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(model.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(model.id, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val providerName = providers.find { it.id == model.providerId }?.name ?: ""
+                        if (providerName.isNotBlank()) {
+                            Text(providerName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        }
                     }
                     TextButton(onClick = { editingModel = model }) { Text("编辑") }
                     TextButton(onClick = { viewModel.removeModel(model.id) }) { Text("删除") }
@@ -329,7 +368,7 @@ private fun DrawerSettingsSection(
             }
             CapsuleButton(
                 text = "添加模型",
-                onClick = { showAddDialog = true }
+                onClick = { showAddModelDialog = true }
             )
 
             Text("主题", style = MaterialTheme.typography.titleSmall)
@@ -345,9 +384,10 @@ private fun DrawerSettingsSection(
         }
     }
 
-    if (showAddDialog) {
+    if (showAddModelDialog) {
         ModelDialog(
-            onDismiss = { showAddDialog = false },
+            providers = providers,
+            onDismiss = { showAddModelDialog = false },
             onConfirm = { viewModel.addModel(it) }
         )
     }
@@ -355,8 +395,24 @@ private fun DrawerSettingsSection(
     editingModel?.let { model ->
         ModelDialog(
             model = model,
+            providers = providers,
             onDismiss = { editingModel = null },
             onConfirm = { viewModel.updateModel(model.id, it) }
+        )
+    }
+
+    if (showAddProviderDialog) {
+        ProviderDialog(
+            onDismiss = { showAddProviderDialog = false },
+            onConfirm = { viewModel.addProvider(it) }
+        )
+    }
+
+    editingProvider?.let { provider ->
+        ProviderDialog(
+            provider = provider,
+            onDismiss = { editingProvider = null },
+            onConfirm = { viewModel.updateProvider(provider.id, it) }
         )
     }
 }
@@ -364,11 +420,14 @@ private fun DrawerSettingsSection(
 @Composable
 private fun ModelDialog(
     model: LlmModel? = null,
+    providers: List<Provider>,
     onDismiss: () -> Unit,
     onConfirm: (LlmModel) -> Unit
 ) {
     var name by remember { mutableStateOf(model?.name ?: "") }
     var id by remember { mutableStateOf(model?.id ?: "") }
+    var providerId by remember { mutableStateOf(model?.providerId ?: providers.firstOrNull()?.id ?: "") }
+    var expanded by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -387,13 +446,95 @@ private fun ModelDialog(
                     label = { Text("模型 ID") },
                     singleLine = true
                 )
+                Box {
+                    OutlinedTextField(
+                        value = providers.find { it.id == providerId }?.name ?: "",
+                        onValueChange = {},
+                        label = { Text("服务商") },
+                        readOnly = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            Icon(
+                                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                modifier = Modifier.clickable { expanded = !expanded }
+                            )
+                        }
+                    )
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        providers.forEach { provider ->
+                            DropdownMenuItem(
+                                text = { Text(provider.name) },
+                                onClick = {
+                                    providerId = provider.id
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     if (id.isNotBlank() && name.isNotBlank()) {
-                        onConfirm(LlmModel(id = id.trim(), name = name.trim()))
+                        onConfirm(LlmModel(id = id.trim(), name = name.trim(), providerId = providerId))
+                        onDismiss()
+                    }
+                }
+            ) { Text("保存") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
+}
+
+@Composable
+private fun ProviderDialog(
+    provider: Provider? = null,
+    onDismiss: () -> Unit,
+    onConfirm: (Provider) -> Unit
+) {
+    var name by remember { mutableStateOf(provider?.name ?: "") }
+    var baseUrl by remember { mutableStateOf(provider?.baseUrl ?: "") }
+    var apiKey by remember { mutableStateOf(provider?.apiKey ?: "") }
+    val id = remember { provider?.id ?: UUID.randomUUID().toString() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (provider == null) "添加服务商" else "编辑服务商") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("名称") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = baseUrl,
+                    onValueChange = { baseUrl = it },
+                    label = { Text("Base URL") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = { apiKey = it },
+                    label = { Text("API Key") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (name.isNotBlank() && baseUrl.isNotBlank()) {
+                        onConfirm(Provider(id = id, name = name.trim(), baseUrl = baseUrl.trim(), apiKey = apiKey))
                         onDismiss()
                     }
                 }

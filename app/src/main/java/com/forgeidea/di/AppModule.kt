@@ -15,6 +15,7 @@ import org.koin.dsl.module
 val appModule = module {
     single {
         Room.databaseBuilder(get(), AppDatabase::class.java, "forgeidea.db")
+            .addMigrations(AppDatabase.MIGRATION_2_3)
             .fallbackToDestructiveMigration()
             .build()
     }

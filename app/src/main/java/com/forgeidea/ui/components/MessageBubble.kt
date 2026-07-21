@@ -43,6 +43,7 @@ import kotlinx.coroutines.delay
 fun MessageBubble(
     message: Message,
     isLoading: Boolean = false,
+    onAnimated: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isUser = message.role == ChatRole.USER
@@ -52,13 +53,13 @@ fun MessageBubble(
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     }
 
-    var hasAnimated by rememberSaveable(message.id) { mutableStateOf(false) }
-    val slideOffset = remember { Animatable(if (isUser && !hasAnimated) 300f else 0f) }
+    val shouldAnimate = isUser && !message.animated
+    val slideOffset = remember { Animatable(if (shouldAnimate) -300f else 0f) }
 
     LaunchedEffect(message.id) {
-        if (isUser && !hasAnimated) {
+        if (shouldAnimate) {
             slideOffset.animateTo(0f, animationSpec = tween(durationMillis = 400))
-            hasAnimated = true
+            onAnimated(message.id)
         }
     }
 
@@ -160,6 +161,26 @@ fun MessageBubble(
             } else if (!isUser && isLoading) {
                 NpmProgress(
                     modifier = Modifier.padding(top = if (message.reasoning.isNotBlank()) 8.dp else 0.dp)
+                )
+            }
+
+            if (!isUser && (message.modelName.isNotBlank() || message.providerName.isNotBlank())) {
+                val meta = buildString {
+                    if (message.modelName.isNotBlank()) append(message.modelName)
+                    if (message.providerName.isNotBlank()) {
+                        if (isNotEmpty()) append(" · ")
+                        append(message.providerName)
+                    }
+                    if (message.durationMs > 0) {
+                        if (isNotEmpty()) append(" · ")
+                        append("${message.durationMs}ms")
+                    }
+                }
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         }

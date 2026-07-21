@@ -45,12 +45,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.forgeidea.domain.model.LlmModel
+import com.forgeidea.domain.model.Provider
 import com.forgeidea.ui.theme.CapsuleShape
 
 @Composable
 fun ChatInput(
     onSend: (String) -> Unit,
     models: List<LlmModel>,
+    providers: List<Provider>,
     selectedModelId: String,
     onModelSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -66,6 +68,7 @@ fun ChatInput(
     if (showModelDialog) {
         ModelSelectionDialog(
             models = models,
+            providers = providers,
             selectedId = selectedModelId,
             onSelect = {
                 onModelSelected(it)
@@ -193,6 +196,7 @@ fun ChatInput(
 @Composable
 private fun ModelSelectionDialog(
     models: List<LlmModel>,
+    providers: List<Provider>,
     selectedId: String,
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit
@@ -228,6 +232,7 @@ private fun ModelSelectionDialog(
                 ) {
                     models.forEach { model ->
                         val selected = model.id == selectedId
+                        val providerName = providers.find { it.id == model.providerId }?.name ?: ""
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -257,6 +262,13 @@ private fun ModelSelectionDialog(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    if (providerName.isNotBlank()) {
+                                        Text(
+                                            text = providerName,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
                                 }
                                 if (selected) {
                                     Box(
