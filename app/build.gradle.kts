@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.qz.agent"
+    namespace = "com.forgeidea"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.qz.agent"
+        applicationId = "com.forgeidea"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
