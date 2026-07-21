@@ -145,13 +145,6 @@ fun ChatInput(
                         .heightIn(min = 24.dp, max = 140.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    if (text.isEmpty()) {
-                        Text(
-                            text = placeholder,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                     BasicTextField(
                         value = text,
                         onValueChange = { text = it },
@@ -162,7 +155,17 @@ fun ChatInput(
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         enabled = enabled,
                         singleLine = false,
-                        maxLines = 6
+                        maxLines = 6,
+                        decorationBox = { innerTextField ->
+                            if (text.isEmpty()) {
+                                Text(
+                                    text = placeholder,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            innerTextField()
+                        }
                     )
                 }
 

@@ -1,5 +1,12 @@
 package com.forgeidea.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -13,7 +20,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -23,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.forgeidea.domain.model.ChatRole
 import com.forgeidea.domain.model.Message
+import kotlinx.coroutines.delay
 
 @Composable
 fun MessageBubble(
@@ -45,6 +55,7 @@ fun MessageBubble(
                 .widthIn(max = 300.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(bubbleColor)
+                .animateContentSize(animationSpec = tween(durationMillis = 300))
                 .padding(12.dp)
         ) {
             if (!isUser) {
@@ -63,6 +74,7 @@ fun MessageBubble(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+                        .animateContentSize(animationSpec = tween(durationMillis = 300))
                         .padding(8.dp)
                 ) {
                     Row(
@@ -85,7 +97,11 @@ fun MessageBubble(
                             )
                         }
                     }
-                    if (expanded) {
+                    AnimatedVisibility(
+                        visible = expanded,
+                        enter = expandVertically(animationSpec = tween(300)) + fadeIn(animationSpec = tween(300)),
+                        exit = shrinkVertically(animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
+                    ) {
                         Text(
                             text = message.reasoning,
                             style = MaterialTheme.typography.bodySmall,
@@ -96,12 +112,28 @@ fun MessageBubble(
                 }
             }
 
-            Text(
-                text = message.content,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = if (message.reasoning.isNotBlank()) 8.dp else 0.dp)
-            )
+            if (message.content.isNotBlank()) {
+                // 逐字渐显动画,总时长 0.5s
+                var visibleChars by remember(message.id) { mutableIntStateOf(0) }
+                val targetLen = message.content.length
+                val durationMs = 500
+                val perCharDelay = if (targetLen > 0) durationMs.toLong() / targetLen else 0L
+
+                LaunchedEffect(message.content) {
+                    visibleChars = 0
+                    repeat(targetLen) {
+                        delay(perCharDelay)
+                        visibleChars++
+                    }
+                }
+
+                Text(
+                    text = message.content.take(visibleChars),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = if (message.reasoning.isNotBlank()) 8.dp else 0.dp)
+                )
+            }
         }
     }
 }
