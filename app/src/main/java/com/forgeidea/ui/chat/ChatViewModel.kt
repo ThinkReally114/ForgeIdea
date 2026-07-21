@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.forgeidea.data.datastore.ApiKeyStore
 import com.forgeidea.domain.model.ChatRole
+import com.forgeidea.domain.model.LlmModel
 import com.forgeidea.domain.model.Message
 import com.forgeidea.domain.usecase.SendMessageUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +31,23 @@ class ChatViewModel(
     private val _selectedModelId = MutableStateFlow(apiKeyStore.getSelectedModelId())
     val selectedModelId: StateFlow<String> = _selectedModelId.asStateFlow()
 
-    val models = apiKeyStore.getModels()
+    private val _models = MutableStateFlow(apiKeyStore.getModels())
+    val models: StateFlow<List<LlmModel>> = _models.asStateFlow()
+
+    init {
+        refreshModels()
+    }
+
+    fun refreshModels() {
+        val currentModels = apiKeyStore.getModels()
+        _models.value = currentModels
+        val currentId = _selectedModelId.value
+        if (currentModels.none { it.id == currentId }) {
+            val fallback = currentModels.firstOrNull()?.id ?: ""
+            _selectedModelId.value = fallback
+            if (fallback.isNotBlank()) apiKeyStore.setSelectedModelId(fallback)
+        }
+    }
 
     fun selectModel(id: String) {
         _selectedModelId.value = id
