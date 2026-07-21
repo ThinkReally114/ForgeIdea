@@ -1,8 +1,12 @@
 package com.forgeidea.data.datastore
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.forgeidea.domain.model.LlmModel
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class ApiKeyStore(context: Context) {
     private val masterKey = MasterKey.Builder(context)
@@ -16,6 +20,8 @@ class ApiKeyStore(context: Context) {
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
+
+    private val plainPrefs: SharedPreferences = context.getSharedPreferences("forgeidea_prefs", Context.MODE_PRIVATE)
 
     fun getApiKey(): String? = prefs.getString(KEY_API_KEY, null)
 
@@ -31,16 +37,37 @@ class ApiKeyStore(context: Context) {
         else prefs.edit().putString(KEY_BASE_URL, url).apply()
     }
 
-    fun getModel(): String? = prefs.getString(KEY_MODEL, null)
-
-    fun setModel(model: String?) {
-        if (model == null) prefs.edit().remove(KEY_MODEL).apply()
-        else prefs.edit().putString(KEY_MODEL, model).apply()
+    fun getModels(): List<LlmModel> {
+        val json = plainPrefs.getString(KEY_MODELS, null) ?: return defaultModels()
+        return try {
+            Json.decodeFromString(json)
+        } catch (e: Exception) {
+            defaultModels()
+        }
     }
+
+    fun setModels(models: List<LlmModel>) {
+        plainPrefs.edit().putString(KEY_MODELS, Json.encodeToString(models)).apply()
+    }
+
+    fun getSelectedModelId(): String {
+        return plainPrefs.getString(KEY_SELECTED_MODEL, null)
+            ?: getModels().firstOrNull()?.id
+            ?: "opencode/big-pickle"
+    }
+
+    fun setSelectedModelId(id: String) {
+        plainPrefs.edit().putString(KEY_SELECTED_MODEL, id).apply()
+    }
+
+    private fun defaultModels(): List<LlmModel> = listOf(
+        LlmModel(id = "opencode/big-pickle", name = "Big Pickle")
+    )
 
     companion object {
         private const val KEY_API_KEY = "api_key"
         private const val KEY_BASE_URL = "base_url"
-        private const val KEY_MODEL = "model"
+        private const val KEY_MODELS = "models"
+        private const val KEY_SELECTED_MODEL = "selected_model"
     }
 }

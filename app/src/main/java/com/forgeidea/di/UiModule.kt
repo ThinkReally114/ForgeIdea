@@ -8,6 +8,6 @@ import org.koin.dsl.module
 
 val uiModule = module {
     single { SendMessageUseCase(get()) }
-    viewModel { ChatViewModel(get()) }
+    viewModel { ChatViewModel(get(), get()) }
     viewModel { SettingsViewModel(get()) }
 }

@@ -2,6 +2,7 @@ package com.forgeidea.ui.settings
 
 import androidx.lifecycle.ViewModel
 import com.forgeidea.data.datastore.ApiKeyStore
+import com.forgeidea.domain.model.LlmModel
 import com.forgeidea.domain.model.PresetTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,10 +22,8 @@ class SettingsViewModel(
     )
     val baseUrl: StateFlow<String> = _baseUrl.asStateFlow()
 
-    private val _model = MutableStateFlow(
-        apiKeyStore.getModel() ?: "opencode/big-pickle"
-    )
-    val model: StateFlow<String> = _model.asStateFlow()
+    private val _models = MutableStateFlow(apiKeyStore.getModels())
+    val models: StateFlow<List<LlmModel>> = _models.asStateFlow()
 
     private val _selectedTheme = MutableStateFlow(PresetTheme.QZ_PURPLE)
     val selectedTheme: StateFlow<PresetTheme> = _selectedTheme.asStateFlow()
@@ -43,11 +42,22 @@ class SettingsViewModel(
         }
     }
 
-    fun setModel(model: String) {
-        viewModelScope.launch {
-            apiKeyStore.setModel(if (model.isBlank()) null else model)
-            _model.value = model
-        }
+    fun addModel(model: LlmModel) {
+        val updated = _models.value + model
+        _models.value = updated
+        apiKeyStore.setModels(updated)
+    }
+
+    fun updateModel(oldId: String, model: LlmModel) {
+        val updated = _models.value.map { if (it.id == oldId) model else it }
+        _models.value = updated
+        apiKeyStore.setModels(updated)
+    }
+
+    fun removeModel(id: String) {
+        val updated = _models.value.filter { it.id != id }
+        _models.value = updated
+        apiKeyStore.setModels(updated)
     }
 
     fun setTheme(theme: PresetTheme) {

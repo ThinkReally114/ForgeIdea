@@ -21,9 +21,12 @@ class SseParser {
             val obj = json.parseToJsonElement(data).jsonObject
             val choices = obj["choices"]?.jsonArray ?: return null
             if (choices.isEmpty()) return null
-            val delta = choices[0].jsonObject["delta"]?.jsonObject
-            val content = delta?.get("content")?.jsonPrimitive?.contentOrNull ?: ""
-            StreamChunk(content)
+            val delta = choices[0].jsonObject["delta"]?.jsonObject ?: return null
+            val content = delta["content"]?.jsonPrimitive?.contentOrNull ?: ""
+            val reasoning = delta["reasoning_content"]?.jsonPrimitive?.contentOrNull
+                ?: delta["reasoning"]?.jsonPrimitive?.contentOrNull
+                ?: ""
+            StreamChunk(content = content, reasoning = reasoning)
         } catch (e: Exception) {
             Log.w(TAG, "parse failed: ${e.message} line=$line")
             null

@@ -23,5 +23,6 @@ data class MessageEntity(
     val role: String,
     val content: String,
     val timestamp: Long,
+    val reasoning: String = "",
     val toolCallId: String?
 )

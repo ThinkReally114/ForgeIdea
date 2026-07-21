@@ -9,6 +9,7 @@ data class Message(
     val role: ChatRole,
     val content: String,
     val timestamp: Long,
+    val reasoning: String = "",
     val toolCalls: List<ToolCall> = emptyList(),
     val toolCallId: String? = null
 )

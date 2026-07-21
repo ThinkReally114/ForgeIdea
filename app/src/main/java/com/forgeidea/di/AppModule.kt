@@ -8,7 +8,7 @@ import org.koin.dsl.module
 
 val appModule = module {
     single {
-        Room.databaseBuilder(get(), AppDatabase::class.java, "qz_agent.db")
+        Room.databaseBuilder(get(), AppDatabase::class.java, "forgeidea.db")
             .fallbackToDestructiveMigration()
             .build()
     }

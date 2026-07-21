@@ -2,6 +2,7 @@ package com.forgeidea.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.forgeidea.data.datastore.ApiKeyStore
 import com.forgeidea.domain.model.ChatRole
 import com.forgeidea.domain.model.Message
 import com.forgeidea.domain.usecase.SendMessageUseCase
@@ -13,7 +14,8 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class ChatViewModel(
-    private val sendMessageUseCase: SendMessageUseCase
+    private val sendMessageUseCase: SendMessageUseCase,
+    private val apiKeyStore: ApiKeyStore
 ) : ViewModel() {
 
     private val _messages = MutableStateFlow<List<Message>>(emptyList())
@@ -24,6 +26,16 @@ class ChatViewModel(
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _selectedModelId = MutableStateFlow(apiKeyStore.getSelectedModelId())
+    val selectedModelId: StateFlow<String> = _selectedModelId.asStateFlow()
+
+    val models = apiKeyStore.getModels()
+
+    fun selectModel(id: String) {
+        _selectedModelId.value = id
+        apiKeyStore.setSelectedModelId(id)
+    }
 
     fun sendUserMessage(text: String) {
         if (_isStreaming.value) return
@@ -42,6 +54,7 @@ class ChatViewModel(
             sessionId = "default",
             role = ChatRole.ASSISTANT,
             content = "",
+            reasoning = "",
             timestamp = System.currentTimeMillis()
         )
         _messages.update { it + assistantMsg }
@@ -50,12 +63,22 @@ class ChatViewModel(
 
         viewModelScope.launch {
             try {
-                sendMessageUseCase(_messages.value.filter { it.id != assistantMsg.id && it.id != userMsg.id }, text)
-                    .collect { chunk ->
-                        _messages.update { msgs ->
-                            msgs.map { if (it.id == assistantMsg.id) it.copy(content = it.content + chunk.content) else it }
+                sendMessageUseCase(
+                    history = _messages.value.filter { it.id != assistantMsg.id && it.id != userMsg.id },
+                    userInput = text,
+                    model = _selectedModelId.value
+                ).collect { chunk ->
+                    _messages.update { msgs ->
+                        msgs.map {
+                            if (it.id == assistantMsg.id) {
+                                it.copy(
+                                    content = it.content + chunk.content,
+                                    reasoning = it.reasoning + chunk.reasoning
+                                )
+                            } else it
                         }
                     }
+                }
             } catch (e: Exception) {
                 _error.value = e.message ?: "未知错误"
                 _messages.update { msgs ->

@@ -27,10 +27,9 @@ class OpenAiCompatibleClient(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    override fun streamChat(messages: List<ChatMessage>): Flow<StreamChunk> = flow {
+    override fun streamChat(messages: List<ChatMessage>, model: String): Flow<StreamChunk> = flow {
         val apiKey = keyStore.getApiKey() ?: ""
         val baseUrl = keyStore.getBaseUrl() ?: "https://api.opencode.ai/v1"
-        val model = keyStore.getModel() ?: "opencode/big-pickle"
 
         if (apiKey.isBlank()) {
             throw IllegalStateException("API Key 未设置，请先到设置页配置")
@@ -65,14 +64,14 @@ class OpenAiCompatibleClient(
             val chunk = sseParser.parse(line)
             if (chunk != null) {
                 if (chunk.isDone) break
-                if (chunk.content.isNotEmpty()) emit(chunk)
+                if (chunk.content.isNotEmpty() || chunk.reasoning.isNotEmpty()) emit(chunk)
             }
         }
     }
 
-    override suspend fun chat(messages: List<ChatMessage>): String {
+    override suspend fun chat(messages: List<ChatMessage>, model: String): String {
         val builder = StringBuilder()
-        streamChat(messages).collect { chunk ->
+        streamChat(messages, model).collect { chunk ->
             builder.append(chunk.content)
         }
         return builder.toString()
