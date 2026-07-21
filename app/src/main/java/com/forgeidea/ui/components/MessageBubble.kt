@@ -3,6 +3,7 @@ package com.forgeidea.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -65,6 +66,7 @@ fun MessageBubble(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
@@ -74,7 +76,7 @@ fun MessageBubble(
                         )
                         TextButton(
                             onClick = { expanded = !expanded },
-                            modifier = Modifier.padding(0.dp)
+                            contentPadding = PaddingValues(0.dp)
                         ) {
                             Text(
                                 text = if (expanded) "收起" else "展开",
