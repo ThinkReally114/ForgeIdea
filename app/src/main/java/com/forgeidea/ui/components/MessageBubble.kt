@@ -2,6 +2,7 @@ package com.forgeidea.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,10 +24,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,8 +48,22 @@ fun MessageBubble(
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     }
 
+    // 用 rememberSaveable 防止导航返回后动画重播
+    var hasAnimated by rememberSaveable(message.id) { mutableStateOf(false) }
+    val slideOffset = remember { Animatable(if (isUser && !hasAnimated) 300f else 0f) }
+
+    LaunchedEffect(message.id) {
+        if (isUser && !hasAnimated) {
+            slideOffset.animateTo(0f, animationSpec = tween(durationMillis = 400))
+            hasAnimated = true
+        }
+    }
+
     Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .offset(y = slideOffset.value.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
         Column(
@@ -68,7 +84,20 @@ fun MessageBubble(
             }
 
             if (message.reasoning.isNotBlank()) {
-                var expanded by remember { mutableStateOf(false) }
+                var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
+                var showReasoning by remember { mutableStateOf(false) }
+
+                LaunchedEffect(expanded) {
+                    if (expanded) {
+                        // 分阶段: 先展开容器(等300ms动画), 再显示思考内容
+                        showReasoning = false
+                        delay(300)
+                        showReasoning = true
+                    } else {
+                        showReasoning = false
+                    }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -98,7 +127,7 @@ fun MessageBubble(
                         }
                     }
                     AnimatedVisibility(
-                        visible = expanded,
+                        visible = showReasoning,
                         enter = expandVertically(animationSpec = tween(300)) + fadeIn(animationSpec = tween(300)),
                         exit = shrinkVertically(animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
                     ) {
@@ -113,22 +142,8 @@ fun MessageBubble(
             }
 
             if (message.content.isNotBlank()) {
-                // 逐字渐显动画,总时长 0.5s
-                var visibleChars by remember(message.id) { mutableIntStateOf(0) }
-                val targetLen = message.content.length
-                val durationMs = 500
-                val perCharDelay = if (targetLen > 0) durationMs.toLong() / targetLen else 0L
-
-                LaunchedEffect(message.content) {
-                    visibleChars = 0
-                    repeat(targetLen) {
-                        delay(perCharDelay)
-                        visibleChars++
-                    }
-                }
-
                 Text(
-                    text = message.content.take(visibleChars),
+                    text = message.content,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(top = if (message.reasoning.isNotBlank()) 8.dp else 0.dp)

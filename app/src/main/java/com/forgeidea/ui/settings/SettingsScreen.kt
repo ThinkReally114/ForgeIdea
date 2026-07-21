@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.forgeidea.domain.model.LlmModel
 import com.forgeidea.domain.model.PresetTheme
@@ -39,7 +40,6 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onThemeChanged: (PresetTheme) -> Unit,
     viewModel: SettingsViewModel = koinViewModel()
 ) {
     val apiKey by viewModel.apiKey.collectAsState()
@@ -59,11 +59,11 @@ fun SettingsScreen(
                 title = { Text("设置") },
                 navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                    containerColor = androidx.compose.ui.graphics.Color.Transparent
+                    containerColor = Color.Transparent
                 )
             )
         },
-        containerColor = androidx.compose.ui.graphics.Color.Transparent
+        containerColor = Color.Transparent
     ) { padding ->
         Column(
             modifier = Modifier
@@ -117,10 +117,7 @@ fun SettingsScreen(
                 PresetTheme.values().forEach { theme ->
                     CapsuleButton(
                         text = theme.displayName,
-                        onClick = {
-                            viewModel.setTheme(theme)
-                            onThemeChanged(theme)
-                        },
+                        onClick = { viewModel.setTheme(theme) },
                         isPrimary = theme == selectedTheme
                     )
                 }

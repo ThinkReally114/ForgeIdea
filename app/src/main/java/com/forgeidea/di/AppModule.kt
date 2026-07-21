@@ -1,9 +1,11 @@
 package com.forgeidea.di
 
 import androidx.room.Room
+import com.forgeidea.data.datastore.ApiKeyStore
 import com.forgeidea.data.local.AppDatabase
 import com.forgeidea.data.local.dao.MessageDao
 import com.forgeidea.data.local.dao.SessionDao
+import com.forgeidea.data.repository.ChatRepository
 import org.koin.dsl.module
 
 val appModule = module {
@@ -14,4 +16,5 @@ val appModule = module {
     }
     single<SessionDao> { get<AppDatabase>().sessionDao() }
     single<MessageDao> { get<AppDatabase>().messageDao() }
+    single { ChatRepository(get(), get(), get()) }
 }
