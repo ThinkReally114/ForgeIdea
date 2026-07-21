@@ -218,9 +218,9 @@ class ChatViewModel(
                 val result = executeCommandTool.execute(args)
                 val content = when (result) {
                     is ToolResult.Success -> {
-                        val stdout = result.data["stdout"]?.toString() ?: ""
-                        val stderr = result.data["stderr"]?.toString() ?: ""
-                        val exitCode = result.data["exitCode"]?.toString() ?: ""
+                        val stdout = (result.data["stdout"] as? JsonPrimitive)?.content ?: ""
+                        val stderr = (result.data["stderr"] as? JsonPrimitive)?.content ?: ""
+                        val exitCode = (result.data["exitCode"] as? JsonPrimitive)?.content ?: ""
                         buildString {
                             if (stdout.isNotBlank()) appendLine("stdout:\n$stdout")
                             if (stderr.isNotBlank()) appendLine("stderr:\n$stderr")

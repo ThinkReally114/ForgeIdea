@@ -89,7 +89,7 @@ class RootfsManager(
             while (!channel.isClosedForRead) {
                 val packet = channel.readRemaining(DEFAULT_BUFFER_SIZE.toLong())
                 val bytes = packet.readBytes()
-                packet.release()
+                packet.close()
                 if (bytes.isNotEmpty()) os.write(bytes)
             }
         }
