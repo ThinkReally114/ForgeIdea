@@ -118,7 +118,7 @@ fun ChatInput(
                         .padding(end = 8.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable(enabled = models.size > 1 && enabled) { showModelDialog = true }
+                        .clickable(enabled = models.isNotEmpty() && enabled) { showModelDialog = true }
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
 

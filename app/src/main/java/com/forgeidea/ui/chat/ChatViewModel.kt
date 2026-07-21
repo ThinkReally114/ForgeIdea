@@ -83,7 +83,9 @@ class ChatViewModel(
             val session = chatRepository.switchToSession(id) ?: return@launch
             _currentSessionId.value = session.id
             _selectedModelId.value = session.modelId.ifBlank { apiKeyStore.getSelectedModelId() }
-            chatRepository.observeMessages(session.id).collect { list ->
+        }
+        viewModelScope.launch {
+            chatRepository.observeMessages(id).collect { list ->
                 _messages.value = list
             }
         }
@@ -93,6 +95,7 @@ class ChatViewModel(
         viewModelScope.launch {
             val session = chatRepository.createNewSession(_selectedModelId.value)
             _currentSessionId.value = session.id
+            loadSession(session.id)
         }
     }
 
@@ -119,8 +122,17 @@ class ChatViewModel(
 
     fun sendUserMessage(text: String) {
         if (_isStreaming.value) return
-        val sessionId = _currentSessionId.value ?: return
         val modelId = _selectedModelId.value
+        if (_currentSessionId.value == null) {
+            viewModelScope.launch {
+                val session = chatRepository.getCurrentOrCreateSession(modelId)
+                _currentSessionId.value = session.id
+                loadSession(session.id)
+                sendUserMessage(text)
+            }
+            return
+        }
+        val sessionId = _currentSessionId.value ?: return
         val provider = apiKeyStore.getProviderForModel(modelId)
         if (provider == null) {
             _error.value = "未找到模型对应的服务商，请先配置"
