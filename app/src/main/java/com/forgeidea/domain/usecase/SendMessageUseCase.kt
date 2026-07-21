@@ -79,7 +79,11 @@ class SendMessageUseCase(
     private fun Message.toChatMessage(): ChatMessage {
         return when (role.name.uppercase()) {
             "USER" -> ChatMessage(role = "user", content = content)
-            "ASSISTANT" -> ChatMessage(role = "assistant", content = content, toolCalls = toolCalls.toResponses())
+            "ASSISTANT" -> ChatMessage(
+                role = "assistant",
+                content = content,
+                toolCalls = toolCalls.takeIf { it.isNotEmpty() }?.toResponses()
+            )
             "TOOL" -> ChatMessage(role = "tool", content = content, toolCallId = toolCallId)
             else -> ChatMessage(role = "system", content = content)
         }
@@ -99,7 +103,7 @@ class SendMessageUseCase(
         return ChatMessage(
             role = role,
             content = content,
-            toolCalls = toolCalls
+            toolCalls = toolCalls?.takeIf { it.isNotEmpty() }
         )
     }
 
