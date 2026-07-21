@@ -95,6 +95,13 @@ class ChatRepository(
         messageDao.updateAnimated(messageId, animated = true)
     }
 
+    suspend fun getMessagesForSession(sessionId: String): List<Message> =
+        messageDao.getBySession(sessionId).map { it.toDomain() }
+
+    suspend fun deleteMessagesAfter(sessionId: String, messageId: String) {
+        messageDao.deleteAfter(sessionId, messageId)
+    }
+
     private fun MessageEntity.toDomain() = Message(
         id = id,
         sessionId = sessionId,

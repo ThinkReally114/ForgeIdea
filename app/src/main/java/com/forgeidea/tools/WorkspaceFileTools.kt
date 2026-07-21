@@ -58,6 +58,7 @@ class WorkspaceFileTools(private val context: Context) {
                 name = "write_file",
                 description = "在工作区中创建新文件或覆盖已有文件，目录不存在会自动创建。当用户需要代码、文本文件或任何文件操作时优先使用此工具。",
                 parameters = buildJsonObject {
+                    put("type", "object")
                     putJsonObject("properties") {
                         putJsonObject("path") {
                             put("type", "string")
@@ -80,6 +81,7 @@ class WorkspaceFileTools(private val context: Context) {
                 name = "read_file",
                 description = "读取工作区中已有文件的内容",
                 parameters = buildJsonObject {
+                    put("type", "object")
                     putJsonObject("properties") {
                         putJsonObject("path") {
                             put("type", "string")

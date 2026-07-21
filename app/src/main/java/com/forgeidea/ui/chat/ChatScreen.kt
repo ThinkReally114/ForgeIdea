@@ -231,10 +231,12 @@ fun ChatScreen(
                         items(messages, key = { it.id }) { msg ->
                             val loading = msg.id == lastMessage?.id && isStreaming && msg.role != ChatRole.USER
                             MessageBubble(
-                                message = msg,
-                                isLoading = loading,
-                                onAnimated = { viewModel.markMessageAnimated(it) }
-                            )
+                            message = msg,
+                            isLoading = loading,
+                            onAnimated = { viewModel.markMessageAnimated(it) },
+                            onRecall = { viewModel.recallMessage(it) },
+                            onRetry = { viewModel.retryLastUserMessage() }
+                        )
                         }
                     }
                 }

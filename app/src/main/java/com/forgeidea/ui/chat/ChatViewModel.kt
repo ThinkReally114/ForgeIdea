@@ -310,6 +310,23 @@ class ChatViewModel(
         }
     }
 
+    fun recallMessage(messageId: String) {
+        val sessionId = _currentSessionId.value ?: return
+        viewModelScope.launch {
+            chatRepository.deleteMessagesAfter(sessionId, messageId)
+        }
+    }
+
+    fun retryLastUserMessage() {
+        val sessionId = _currentSessionId.value ?: return
+        viewModelScope.launch {
+            val messages = chatRepository.getMessagesForSession(sessionId)
+            val lastUser = messages.findLast { it.role == ChatRole.USER } ?: return@launch
+            chatRepository.deleteMessagesAfter(sessionId, lastUser.id)
+            sendUserMessage(lastUser.content)
+        }
+    }
+
     fun markMessageAnimated(messageId: String) {
         viewModelScope.launch {
             chatRepository.markMessageAnimated(messageId)

@@ -15,8 +15,14 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE sessionId = :sessionId ORDER BY timestamp ASC")
     fun observeBySession(sessionId: String): Flow<List<MessageEntity>>
 
+    @Query("SELECT * FROM messages WHERE sessionId = :sessionId ORDER BY timestamp ASC")
+    suspend fun getBySession(sessionId: String): List<MessageEntity>
+
     @Query("DELETE FROM messages WHERE sessionId = :sessionId")
     suspend fun deleteBySession(sessionId: String)
+
+    @Query("DELETE FROM messages WHERE sessionId = :sessionId AND timestamp > (SELECT timestamp FROM messages WHERE id = :messageId)")
+    suspend fun deleteAfter(sessionId: String, messageId: String)
 
     @Query("SELECT COUNT(*) FROM messages WHERE sessionId = :sessionId")
     suspend fun countBySession(sessionId: String): Int
