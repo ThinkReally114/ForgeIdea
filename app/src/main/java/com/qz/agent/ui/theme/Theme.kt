@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.Color
 import com.qz.agent.domain.model.PresetTheme
 
 @Composable
-fun QZAgentTheme(
+fun ForgeIdeaTheme(
     theme: PresetTheme = PresetTheme.QZ_PURPLE,
     content: @Composable () -> Unit
 ) {

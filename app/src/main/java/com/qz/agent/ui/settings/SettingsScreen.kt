@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -32,9 +34,14 @@ fun SettingsScreen(
     onThemeChanged: (PresetTheme) -> Unit,
     viewModel: SettingsViewModel = koinViewModel()
 ) {
-    val zenKey by viewModel.zenApiKey.collectAsState()
+    val apiKey by viewModel.apiKey.collectAsState()
+    val baseUrl by viewModel.baseUrl.collectAsState()
+    val model by viewModel.model.collectAsState()
     val selectedTheme by viewModel.selectedTheme.collectAsState()
-    var keyInput by remember { mutableStateOf(zenKey) }
+
+    var keyInput by remember { mutableStateOf(apiKey) }
+    var baseUrlInput by remember { mutableStateOf(baseUrl) }
+    var modelInput by remember { mutableStateOf(model) }
 
     Scaffold(
         topBar = {
@@ -51,21 +58,40 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(padding)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("OpenCode Zen API Key", style = MaterialTheme.typography.titleLarge)
+            Text("API 配置", style = MaterialTheme.typography.titleLarge)
             OutlinedTextField(
                 value = keyInput,
                 onValueChange = { keyInput = it },
-                label = { Text("Zen API Key") },
+                label = { Text("API Key") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = baseUrlInput,
+                onValueChange = { baseUrlInput = it },
+                label = { Text("服务商 Base URL") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = modelInput,
+                onValueChange = { modelInput = it },
+                label = { Text("模型 ID") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
             CapsuleButton(
                 text = "保存",
-                onClick = { viewModel.setZenApiKey(keyInput) },
+                onClick = {
+                    viewModel.setApiKey(keyInput)
+                    viewModel.setBaseUrl(baseUrlInput)
+                    viewModel.setModel(modelInput)
+                },
                 isPrimary = true
             )
 

@@ -42,7 +42,7 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("QZ Agent") },
+                title = { Text("ForgeIdea") },
                 actions = {
                     androidx.compose.material3.TextButton(onClick = onOpenSettings) {
                         Text("设置")

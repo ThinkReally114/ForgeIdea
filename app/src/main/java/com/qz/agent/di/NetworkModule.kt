@@ -27,10 +27,13 @@ val networkModule = module {
     single { ApiKeyStore(get()) }
     single<LlmClient> {
         val keyStore = get<ApiKeyStore>()
-        val apiKey = keyStore.getZenApiKey() ?: ""
         OpenAiCompatibleClient(
             httpClient = get(),
-            config = ZenConfig(apiKey = apiKey)
+            config = ZenConfig(
+                apiKey = keyStore.getApiKey() ?: "",
+                baseUrl = keyStore.getBaseUrl() ?: "https://api.opencode.ai/v1",
+                model = keyStore.getModel() ?: "opencode/big-pickle"
+            )
         )
     }
 }

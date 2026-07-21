@@ -17,22 +17,30 @@ class ApiKeyStore(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    fun getZenApiKey(): String? = prefs.getString(KEY_ZEN, null)
+    fun getApiKey(): String? = prefs.getString(KEY_API_KEY, null)
 
-    fun setZenApiKey(key: String?) {
-        if (key == null) prefs.edit().remove(KEY_ZEN).apply()
-        else prefs.edit().putString(KEY_ZEN, key).apply()
+    fun setApiKey(key: String?) {
+        if (key == null) prefs.edit().remove(KEY_API_KEY).apply()
+        else prefs.edit().putString(KEY_API_KEY, key).apply()
     }
 
-    fun getExaApiKey(): String? = prefs.getString(KEY_EXA, null)
+    fun getBaseUrl(): String? = prefs.getString(KEY_BASE_URL, null)
 
-    fun setExaApiKey(key: String?) {
-        if (key == null) prefs.edit().remove(KEY_EXA).apply()
-        else prefs.edit().putString(KEY_EXA, key).apply()
+    fun setBaseUrl(url: String?) {
+        if (url == null) prefs.edit().remove(KEY_BASE_URL).apply()
+        else prefs.edit().putString(KEY_BASE_URL, url).apply()
+    }
+
+    fun getModel(): String? = prefs.getString(KEY_MODEL, null)
+
+    fun setModel(model: String?) {
+        if (model == null) prefs.edit().remove(KEY_MODEL).apply()
+        else prefs.edit().putString(KEY_MODEL, model).apply()
     }
 
     companion object {
-        private const val KEY_ZEN = "zen_api_key"
-        private const val KEY_EXA = "exa_api_key"
+        private const val KEY_API_KEY = "api_key"
+        private const val KEY_BASE_URL = "base_url"
+        private const val KEY_MODEL = "model"
     }
 }
