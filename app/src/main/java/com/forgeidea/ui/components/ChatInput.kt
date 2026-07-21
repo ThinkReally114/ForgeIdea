@@ -108,9 +108,11 @@ fun ChatInput(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = selectedModel?.name?.take(10) ?: "模型",
+                    text = selectedModel?.name ?: "模型",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .padding(end = 8.dp)
                         .clip(RoundedCornerShape(8.dp))

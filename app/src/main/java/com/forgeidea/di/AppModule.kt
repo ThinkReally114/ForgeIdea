@@ -3,13 +3,13 @@ package com.forgeidea.di
 import androidx.room.Room
 import com.forgeidea.data.datastore.ApiKeyStore
 import com.forgeidea.data.local.AppDatabase
-import com.forgeidea.data.local.dao.MessageDao
-import com.forgeidea.data.local.dao.SessionDao
 import com.forgeidea.data.repository.ChatRepository
-import com.forgeidea.git.GitTool
-import com.forgeidea.terminal.ProotShellExecutor
-import com.forgeidea.terminal.ShellExecutor
+import com.forgeidea.domain.usecase.SendMessageUseCase
+import com.forgeidea.tools.ExecuteCommandTool
+import com.forgeidea.tools.WorkspaceFileTools
+import com.forgeidea.ui.settings.SettingsViewModel
 import org.koin.android.ext.koin.androidContext
+import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
 val appModule = module {
@@ -19,9 +19,11 @@ val appModule = module {
             .fallbackToDestructiveMigration()
             .build()
     }
-    single<SessionDao> { get<AppDatabase>().sessionDao() }
-    single<MessageDao> { get<AppDatabase>().messageDao() }
+    single { get<AppDatabase>().sessionDao() }
+    single { get<AppDatabase>().messageDao() }
+    single { ApiKeyStore(androidContext()) }
     single { ChatRepository(get(), get(), get()) }
-    single<ShellExecutor> { ProotShellExecutor(androidContext(), get()) }
-    single { GitTool(androidContext().filesDir.resolve("workspace")) }
+    single { ExecuteCommandTool(androidContext()) }
+    single { WorkspaceFileTools(androidContext()) }
+    single { SendMessageUseCase(get(), get()) }
 }

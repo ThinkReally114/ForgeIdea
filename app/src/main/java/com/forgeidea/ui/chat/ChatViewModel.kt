@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.forgeidea.data.datastore.ApiKeyStore
-import com.forgeidea.data.local.entity.SessionEntity
 import com.forgeidea.data.repository.ChatRepository
 import com.forgeidea.domain.model.ChatRole
 import com.forgeidea.domain.model.LlmModel
@@ -12,21 +11,20 @@ import com.forgeidea.domain.model.Message
 import com.forgeidea.domain.model.Provider
 import com.forgeidea.domain.usecase.SendMessageUseCase
 import com.forgeidea.tools.ExecuteCommandTool
-import com.forgeidea.tools.ToolResult
-import kotlinx.coroutines.Job
+import com.forgeidea.tools.WorkspaceFileTools
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import java.util.UUID
 
 class ChatViewModel(
     private val sendMessageUseCase: SendMessageUseCase,
     private val apiKeyStore: ApiKeyStore,
     private val chatRepository: ChatRepository,
-    private val executeCommandTool: ExecuteCommandTool
+    private val executeCommandTool: ExecuteCommandTool,
+    private val workspaceFileTools: WorkspaceFileTools
 ) : ViewModel() {
 
     private val _messages = MutableStateFlow<List<Message>>(emptyList())
@@ -50,44 +48,17 @@ class ChatViewModel(
     private val _currentSessionId = MutableStateFlow<String?>(apiKeyStore.getCurrentSessionId())
     val currentSessionId: StateFlow<String?> = _currentSessionId.asStateFlow()
 
-    private val _sessions = MutableStateFlow<List<SessionEntity>>(emptyList())
-    val sessions: StateFlow<List<SessionEntity>> = _sessions.asStateFlow()
+    private val _sessions = MutableStateFlow<List<com.forgeidea.data.local.entity.SessionEntity>>(emptyList())
+    val sessions: StateFlow<List<com.forgeidea.data.local.entity.SessionEntity>> = _sessions.asStateFlow()
 
-    private val _currentSessionTitle = MutableStateFlow("")
-    val currentSessionTitle: StateFlow<String> = _currentSessionTitle.asStateFlow()
-
-    private var messageObserverJob: Job? = null
+    private val _workspaceFiles = MutableStateFlow<List<String>>(emptyList())
+    val workspaceFiles: StateFlow<List<String>> = _workspaceFiles.asStateFlow()
 
     init {
-        refreshModels()
-        observeSessions()
-        loadCurrentSession()
-    }
-
-    private fun observeSessions() {
         viewModelScope.launch {
-            chatRepository.observeSessions().collect { sessions ->
-                _sessions.value = sessions
-                updateCurrentSessionTitle()
-            }
-        }
-    }
-
-    private fun updateCurrentSessionTitle() {
-        val id = _currentSessionId.value
-        _currentSessionTitle.value = _sessions.value.find { it.id == id }?.title ?: ""
-    }
-
-    private fun loadCurrentSession() {
-        messageObserverJob?.cancel()
-        messageObserverJob = viewModelScope.launch {
-            val sessionId = _currentSessionId.value
-                ?: chatRepository.getCurrentOrCreateSession(_selectedModelId.value).also {
-                    _currentSessionId.value = it.id
-                }.id
-            updateCurrentSessionTitle()
-            chatRepository.observeMessages(sessionId).collect { msgs ->
-                _messages.value = msgs
+            _currentSessionId.value?.let { loadSession(it) }
+            chatRepository.observeSessions().collect { list ->
+                _sessions.value = list.sortedByDescending { it.updatedAt }
             }
         }
     }
@@ -104,38 +75,32 @@ class ChatViewModel(
         }
     }
 
-    fun selectModel(id: String) {
-        _selectedModelId.value = id
-        apiKeyStore.setSelectedModelId(id)
+    fun loadSession(id: String) {
+        viewModelScope.launch {
+            val session = chatRepository.switchToSession(id) ?: return@launch
+            _currentSessionId.value = session.id
+            _selectedModelId.value = session.modelId.ifBlank { apiKeyStore.getSelectedModelId() }
+            chatRepository.observeMessages(session.id).collect { list ->
+                _messages.value = list
+            }
+        }
     }
 
     fun createNewSession() {
         viewModelScope.launch {
             val session = chatRepository.createNewSession(_selectedModelId.value)
             _currentSessionId.value = session.id
-            _currentSessionTitle.value = session.title
-            _messages.value = emptyList()
-            messageObserverJob?.cancel()
-            messageObserverJob = viewModelScope.launch {
-                chatRepository.observeMessages(session.id).collect { msgs ->
-                    _messages.value = msgs
-                }
-            }
         }
     }
 
-    fun switchToSession(id: String) {
+    fun selectModel(id: String) {
+        _selectedModelId.value = id
+        apiKeyStore.setSelectedModelId(id)
+    }
+
+    fun renameSession(id: String, title: String) {
         viewModelScope.launch {
-            val session = chatRepository.switchToSession(id) ?: return@launch
-            _currentSessionId.value = session.id
-            _currentSessionTitle.value = session.title
-            _selectedModelId.value = session.modelId
-            messageObserverJob?.cancel()
-            messageObserverJob = viewModelScope.launch {
-                chatRepository.observeMessages(session.id).collect { msgs ->
-                    _messages.value = msgs
-                }
-            }
+            chatRepository.renameSession(id, title)
         }
     }
 
@@ -144,18 +109,7 @@ class ChatViewModel(
             chatRepository.deleteSession(id)
             if (_currentSessionId.value == id) {
                 _currentSessionId.value = null
-                loadCurrentSession()
-            } else {
-                updateCurrentSessionTitle()
-            }
-        }
-    }
-
-    fun renameSession(id: String, title: String) {
-        viewModelScope.launch {
-            chatRepository.renameSession(id, title)
-            if (_currentSessionId.value == id) {
-                updateCurrentSessionTitle()
+                _messages.value = emptyList()
             }
         }
     }
@@ -205,53 +159,57 @@ class ChatViewModel(
                 _error.value = null
 
                 val history = _messages.value.filter { it.id != assistantId }
-                var currentContent = ""
-                var currentReasoning = ""
-                val startTime = System.currentTimeMillis()
-                sendMessageUseCase(
+                val result = sendMessageUseCase.send(
+                    sessionId = sessionId,
                     history = history,
                     userInput = text,
                     model = modelId,
                     provider = provider
-                ).collect { chunk ->
-                    currentContent += chunk.content
-                    currentReasoning += chunk.reasoning
-                    val updated = assistantMsg.copy(
-                        content = currentContent,
-                        reasoning = currentReasoning
-                    )
-                    chatRepository.updateMessage(sessionId, updated)
-                }
+                )
 
-                val durationMs = System.currentTimeMillis() - startTime
-                if (currentContent.isBlank() && currentReasoning.isBlank()) {
+                val fullContent = result.content
+                val fullReasoning = result.reasoning
+                if (fullContent.isBlank() && fullReasoning.isBlank()) {
                     val errMsg = assistantMsg.copy(
                         content = "❌ 没有收到回复内容",
                         modelName = modelName,
                         providerName = provider.name,
-                        durationMs = durationMs
+                        durationMs = result.durationMs
                     )
                     chatRepository.updateMessage(sessionId, errMsg)
-                } else {
-                    val finalMsg = assistantMsg.copy(
-                        content = currentContent,
-                        reasoning = currentReasoning,
-                        modelName = modelName,
-                        providerName = provider.name,
-                        durationMs = durationMs
+                } else if (fullContent.length <= 2) {
+                    chatRepository.updateMessage(
+                        sessionId,
+                        assistantMsg.copy(
+                            content = fullContent,
+                            reasoning = fullReasoning,
+                            modelName = modelName,
+                            providerName = provider.name,
+                            durationMs = result.durationMs
+                        )
                     )
-                    chatRepository.updateMessage(sessionId, finalMsg)
+                } else {
+                    val chunkSize = (fullContent.length / 40).coerceAtLeast(1)
+                    var currentLength = 0
+                    while (currentLength < fullContent.length) {
+                        currentLength = (currentLength + chunkSize).coerceAtMost(fullContent.length)
+                        chatRepository.updateMessage(
+                            sessionId,
+                            assistantMsg.copy(
+                                content = fullContent.take(currentLength),
+                                reasoning = if (currentLength >= fullContent.length) fullReasoning else "",
+                                modelName = modelName,
+                                providerName = provider.name,
+                                durationMs = result.durationMs
+                            )
+                        )
+                        delay(16)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "sendUserMessage failed", e)
                 _error.value = e.message ?: "未知错误"
-                val durationMs = System.currentTimeMillis() - (assistantMsg.timestamp - 1)
-                val errMsg = assistantMsg.copy(
-                    content = "❌ ${e.message ?: "请求失败"}",
-                    modelName = modelName,
-                    providerName = provider.name,
-                    durationMs = durationMs
-                )
+                val errMsg = assistantMsg.copy(content = "❌ ${e.message ?: "请求失败"}")
                 chatRepository.updateMessage(sessionId, errMsg)
             } finally {
                 _isStreaming.value = false
@@ -260,41 +218,51 @@ class ChatViewModel(
     }
 
     private fun handleCommandExecution(sessionId: String, command: String) {
-        _isStreaming.value = true
+        val assistantId = UUID.randomUUID().toString()
         val assistantMsg = Message(
-            id = UUID.randomUUID().toString(),
+            id = assistantId,
             sessionId = sessionId,
             role = ChatRole.ASSISTANT,
             content = "",
-            reasoning = "",
-            timestamp = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis() + 1
         )
+
         viewModelScope.launch {
             try {
                 chatRepository.addMessage(sessionId, assistantMsg)
-                val args = buildJsonObject { put("command", JsonPrimitive(command)) }
-                val result = executeCommandTool.execute(args)
-                val content = when (result) {
-                    is ToolResult.Success -> {
-                        val stdout = (result.data["stdout"] as? JsonPrimitive)?.content ?: ""
-                        val stderr = (result.data["stderr"] as? JsonPrimitive)?.content ?: ""
-                        val exitCode = (result.data["exitCode"] as? JsonPrimitive)?.content ?: ""
-                        buildString {
-                            if (stdout.isNotBlank()) appendLine("stdout:\n$stdout")
-                            if (stderr.isNotBlank()) appendLine("stderr:\n$stderr")
-                            append("exitCode: $exitCode")
-                        }
-                    }
-                    is ToolResult.Error -> "❌ ${result.message}"
-                }
-                chatRepository.updateMessage(sessionId, assistantMsg.copy(content = content))
+                _isStreaming.value = true
+                _error.value = null
+                val result = executeCommandTool.execute(command)
+                val output = result.getOrNull() ?: "❌ 命令执行失败"
+                chatRepository.updateMessage(sessionId, assistantMsg.copy(content = output))
             } catch (e: Exception) {
-                Log.e(TAG, "handleCommandExecution failed", e)
-                val errMsg = assistantMsg.copy(content = "❌ ${e.message ?: "执行失败"}")
-                chatRepository.updateMessage(sessionId, errMsg)
+                Log.e(TAG, "Command execution failed", e)
+                _error.value = e.message ?: "命令执行失败"
+                chatRepository.updateMessage(sessionId, assistantMsg.copy(content = "❌ ${e.message}"))
             } finally {
                 _isStreaming.value = false
             }
+        }
+    }
+
+    fun refreshWorkspaceFiles() {
+        val sessionId = _currentSessionId.value ?: return
+        _workspaceFiles.value = workspaceFileTools.listFiles(sessionId)
+    }
+
+    fun createWorkspaceFile(path: String, content: String = "") {
+        val sessionId = _currentSessionId.value ?: return
+        viewModelScope.launch {
+            workspaceFileTools.createFile(sessionId, path, content)
+            refreshWorkspaceFiles()
+        }
+    }
+
+    fun deleteWorkspaceFile(path: String) {
+        val sessionId = _currentSessionId.value ?: return
+        viewModelScope.launch {
+            workspaceFileTools.resolveWorkspaceFile(sessionId, path).deleteRecursively()
+            refreshWorkspaceFiles()
         }
     }
 

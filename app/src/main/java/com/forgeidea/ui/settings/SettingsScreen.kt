@@ -50,14 +50,9 @@ fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = koinViewModel()
 ) {
-    val apiKey by viewModel.apiKey.collectAsState()
-    val baseUrl by viewModel.baseUrl.collectAsState()
     val models by viewModel.models.collectAsState()
     val providers by viewModel.providers.collectAsState()
     val selectedTheme by viewModel.selectedTheme.collectAsState()
-
-    var keyInput by remember { mutableStateOf(apiKey) }
-    var baseUrlInput by remember { mutableStateOf(baseUrl) }
 
     var showAddModelDialog by remember { mutableStateOf(false) }
     var editingModel by remember { mutableStateOf<LlmModel?>(null) }
@@ -84,30 +79,6 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("API 配置", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(
-                value = keyInput,
-                onValueChange = { keyInput = it },
-                label = { Text("API Key") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = baseUrlInput,
-                onValueChange = { baseUrlInput = it },
-                label = { Text("服务商 Base URL") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            CapsuleButton(
-                text = "保存 API 配置",
-                onClick = {
-                    viewModel.setApiKey(keyInput)
-                    viewModel.setBaseUrl(baseUrlInput)
-                },
-                isPrimary = true
-            )
-
             Text("服务商列表", style = MaterialTheme.typography.titleLarge)
             providers.forEach { provider ->
                 ProviderItem(

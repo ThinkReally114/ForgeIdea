@@ -1,33 +1,24 @@
 package com.forgeidea.ui.chat
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -35,6 +26,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
@@ -50,13 +42,15 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
-import java.util.UUID
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,47 +62,66 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.forgeidea.domain.model.ChatRole
-import com.forgeidea.domain.model.LlmModel
-import com.forgeidea.domain.model.PresetTheme
-import com.forgeidea.domain.model.Provider
-import com.forgeidea.ui.components.CapsuleButton
 import com.forgeidea.ui.components.ChatInput
 import com.forgeidea.ui.components.MessageBubble
-import com.forgeidea.ui.settings.SettingsViewModel
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
-import androidx.activity.compose.BackHandler
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    viewModel: ChatViewModel = koinViewModel(),
-    settingsViewModel: SettingsViewModel = koinViewModel()
+    onNavigateToSettings: () -> Unit,
+    viewModel: ChatViewModel = koinViewModel()
 ) {
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
     val messages by viewModel.messages.collectAsState()
     val isStreaming by viewModel.isStreaming.collectAsState()
+    val error by viewModel.error.collectAsState()
     val selectedModelId by viewModel.selectedModelId.collectAsState()
     val models by viewModel.models.collectAsState()
     val providers by viewModel.providers.collectAsState()
     val sessions by viewModel.sessions.collectAsState()
     val currentSessionId by viewModel.currentSessionId.collectAsState()
-    val currentSessionTitle by viewModel.currentSessionTitle.collectAsState()
-    val listState = rememberLazyListState()
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+    val workspaceFiles by viewModel.workspaceFiles.collectAsState()
 
-    val drawerOpen = drawerState.currentValue == DrawerValue.Open
-    BackHandler(enabled = drawerOpen) {
-        scope.launch { drawerState.close() }
+    LaunchedEffect(Unit) {
+        viewModel.refreshModels()
+        viewModel.refreshWorkspaceFiles()
     }
 
-    LaunchedEffect(messages.size, messages.lastOrNull()?.content, messages.lastOrNull()?.reasoning) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshModels()
+            }
         }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(currentSessionId) {
+        viewModel.refreshWorkspaceFiles()
+    }
+
+    LaunchedEffect(error) {
+        error?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
+
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
     }
 
     ModalNavigationDrawer(
@@ -122,12 +135,32 @@ fun ChatScreen(
                 DrawerContent(
                     sessions = sessions,
                     currentSessionId = currentSessionId,
-                    currentSessionTitle = currentSessionTitle,
-                    onNewSession = { viewModel.createNewSession() },
-                    onSwitchSession = { viewModel.switchToSession(it) },
-                    onDeleteSession = { viewModel.deleteSession(it) },
-                    onRenameSession = { id, title -> viewModel.renameSession(id, title) },
-                    settingsViewModel = settingsViewModel
+                    workspaceFiles = workspaceFiles,
+                    onSessionSelected = { id ->
+                        viewModel.loadSession(id)
+                        scope.launch { drawerState.close() }
+                    },
+                    onNewSession = {
+                        viewModel.createNewSession()
+                        scope.launch { drawerState.close() }
+                    },
+                    onRenameSession = { id, title ->
+                        viewModel.renameSession(id, title)
+                    },
+                    onDeleteSession = { id ->
+                        viewModel.deleteSession(id)
+                    },
+                    onRefreshWorkspace = { viewModel.refreshWorkspaceFiles() },
+                    onCreateWorkspaceFile = { path, content ->
+                        viewModel.createWorkspaceFile(path, content)
+                    },
+                    onDeleteWorkspaceFile = { path ->
+                        viewModel.deleteWorkspaceFile(path)
+                    },
+                    onNavigateToSettings = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToSettings()
+                    }
                 )
             }
         }
@@ -135,42 +168,41 @@ fun ChatScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("ForgeIdea") },
-                    navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, contentDescription = "对话列表")
-                        }
-                    },
-                    actions = {
+                    title = {
                         Text(
-                            text = currentSessionTitle,
-                            style = MaterialTheme.typography.bodyMedium,
+                            sessions.find { it.id == currentSessionId }?.title ?: "新对话",
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(end = 16.dp)
+                            overflow = TextOverflow.Ellipsis
                         )
                     },
+                    navigationIcon = {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "打开侧边栏")
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
+                        containerColor = Color.Transparent,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
             },
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            containerColor = Color.Transparent
         ) { padding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .imePadding()
             ) {
+                val lastMessage = messages.lastOrNull()
                 LazyColumn(
-                    state = listState,
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    contentPadding = WindowInsets.navigationBars.asPaddingValues()
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp),
+                    reverseLayout = false,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val lastMessage = messages.lastOrNull()
                     items(messages, key = { it.id }) { msg ->
                         val loading = msg.id == lastMessage?.id && isStreaming && msg.role != ChatRole.USER
                         MessageBubble(
@@ -180,6 +212,7 @@ fun ChatScreen(
                         )
                     }
                 }
+
                 ChatInput(
                     onSend = { viewModel.sendUserMessage(it) },
                     models = models,
@@ -197,348 +230,278 @@ fun ChatScreen(
 private fun DrawerContent(
     sessions: List<com.forgeidea.data.local.entity.SessionEntity>,
     currentSessionId: String?,
-    currentSessionTitle: String,
+    workspaceFiles: List<String>,
+    onSessionSelected: (String) -> Unit,
     onNewSession: () -> Unit,
-    onSwitchSession: (String) -> Unit,
-    onDeleteSession: (String) -> Unit,
     onRenameSession: (String, String) -> Unit,
-    settingsViewModel: SettingsViewModel
+    onDeleteSession: (String) -> Unit,
+    onRefreshWorkspace: () -> Unit,
+    onCreateWorkspaceFile: (String, String) -> Unit,
+    onDeleteWorkspaceFile: (String) -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
+    var showWorkspace by remember { mutableStateOf(false) }
+    var showNewFileDialog by remember { mutableStateOf(false) }
+    var fileToDelete by remember { mutableStateOf<String?>(null) }
+
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 16.dp)
+            .fillMaxHeight()
+            .padding(vertical = 12.dp)
     ) {
-        Text(
-            text = "ForgeIdea",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onNewSession() }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 12.dp))
+            Text("新对话", style = MaterialTheme.typography.titleMedium)
+        }
 
-        NavigationDrawerItem(
-            label = { Text("新建对话") },
-            selected = false,
-            onClick = onNewSession,
-            icon = { Icon(Icons.Default.Add, contentDescription = "新建") },
-            modifier = Modifier.padding(horizontal = 12.dp)
-        )
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "对话列表",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        )
-        sessions.forEach { session ->
-            val isCurrent = session.id == currentSessionId
-            NavigationDrawerItem(
-                label = { Text(session.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                selected = isCurrent,
-                onClick = { onSwitchSession(session.id) },
-                badge = {
-                    Row {
-                        IconButton(onClick = { onRenameSession(session.id, session.title) }) {
-                            Icon(Icons.Default.Edit, contentDescription = "重命名", modifier = Modifier.width(18.dp))
-                        }
-                        IconButton(onClick = { onDeleteSession(session.id) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "删除", modifier = Modifier.width(18.dp))
-                        }
-                    }
-                },
-                modifier = Modifier.padding(horizontal = 12.dp)
+        LazyColumn(
+            modifier = Modifier.weight(1f)
+        ) {
+            items(sessions, key = { it.id }) { session ->
+                SessionDrawerItem(
+                    session = session,
+                    selected = session.id == currentSessionId,
+                    onClick = { onSessionSelected(session.id) },
+                    onRename = { onRenameSession(session.id, it) },
+                    onDelete = { onDeleteSession(session.id) }
+                )
+            }
+        }
+
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showWorkspace = !showWorkspace }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Menu, contentDescription = null, modifier = Modifier.padding(end = 12.dp))
+                Text("工作区", style = MaterialTheme.typography.titleMedium)
+            }
+            Icon(
+                imageVector = if (showWorkspace) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null
             )
         }
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+        AnimatedVisibility(
+            visible = showWorkspace,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("文件", style = MaterialTheme.typography.titleSmall)
+                    TextButton(onClick = { showNewFileDialog = true }) { Text("新建") }
+                }
+                if (workspaceFiles.isEmpty()) {
+                    Text("暂无文件", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                } else {
+                    workspaceFiles.forEach { file ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = file,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = { fileToDelete = file },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "删除", modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-        DrawerSettingsSection(viewModel = settingsViewModel)
-    }
-}
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-@Composable
-private fun DrawerSettingsSection(
-    viewModel: SettingsViewModel
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val apiKey by viewModel.apiKey.collectAsState()
-    val baseUrl by viewModel.baseUrl.collectAsState()
-    val models by viewModel.models.collectAsState()
-    val providers by viewModel.providers.collectAsState()
-    val selectedTheme by viewModel.selectedTheme.collectAsState()
-
-    var keyInput by remember { mutableStateOf(apiKey) }
-    var urlInput by remember { mutableStateOf(baseUrl) }
-    var showAddModelDialog by remember { mutableStateOf(false) }
-    var editingModel by remember { mutableStateOf<LlmModel?>(null) }
-    var showAddProviderDialog by remember { mutableStateOf(false) }
-    var editingProvider by remember { mutableStateOf<Provider?>(null) }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Settings, contentDescription = "设置", modifier = Modifier.padding(end = 12.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onNavigateToSettings() }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.padding(end = 12.dp))
             Text("设置", style = MaterialTheme.typography.titleMedium)
         }
-        Icon(
-            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-            contentDescription = null
-        )
     }
 
-    AnimatedVisibility(
-        visible = expanded,
-        enter = expandVertically() + fadeIn(),
-        exit = shrinkVertically() + fadeOut()
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedTextField(
-                value = keyInput,
-                onValueChange = { keyInput = it },
-                label = { Text("API Key") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = urlInput,
-                onValueChange = { urlInput = it },
-                label = { Text("Base URL") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            CapsuleButton(
-                text = "保存 API 配置",
-                onClick = {
-                    viewModel.setApiKey(keyInput)
-                    viewModel.setBaseUrl(urlInput)
-                },
-                isPrimary = true
-            )
-
-            Text("服务商", style = MaterialTheme.typography.titleSmall)
-            providers.forEach { provider ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(provider.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(provider.baseUrl, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    TextButton(onClick = { editingProvider = provider }) { Text("编辑") }
-                    if (provider.id != "default") {
-                        TextButton(onClick = { viewModel.removeProvider(provider.id) }) { Text("删除") }
-                    }
-                }
+    if (showNewFileDialog) {
+        NewWorkspaceFileDialog(
+            onDismiss = { showNewFileDialog = false },
+            onConfirm = { path, content ->
+                onCreateWorkspaceFile(path, content)
+                showNewFileDialog = false
             }
-            CapsuleButton(
-                text = "添加服务商",
-                onClick = { showAddProviderDialog = true }
-            )
+        )
+    }
 
-            Text("模型", style = MaterialTheme.typography.titleSmall)
-            models.forEach { model ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(model.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(model.id, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        val providerName = providers.find { it.id == model.providerId }?.name ?: ""
-                        if (providerName.isNotBlank()) {
-                            Text(providerName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                        }
-                    }
-                    TextButton(onClick = { editingModel = model }) { Text("编辑") }
-                    TextButton(onClick = { viewModel.removeModel(model.id) }) { Text("删除") }
-                }
+    fileToDelete?.let { path ->
+        AlertDialog(
+            onDismissRequest = { fileToDelete = null },
+            title = { Text("删除文件") },
+            text = { Text("确定删除 $path 吗？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteWorkspaceFile(path)
+                    fileToDelete = null
+                }) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { fileToDelete = null }) { Text("取消") }
             }
-            CapsuleButton(
-                text = "添加模型",
-                onClick = { showAddModelDialog = true }
-            )
-
-            Text("主题", style = MaterialTheme.typography.titleSmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PresetTheme.values().forEach { theme ->
-                    CapsuleButton(
-                        text = theme.displayName,
-                        onClick = { viewModel.setTheme(theme) },
-                        isPrimary = theme == selectedTheme
-                    )
-                }
-            }
-        }
-    }
-
-    if (showAddModelDialog) {
-        ModelDialog(
-            providers = providers,
-            onDismiss = { showAddModelDialog = false },
-            onConfirm = { viewModel.addModel(it) }
-        )
-    }
-
-    editingModel?.let { model ->
-        ModelDialog(
-            model = model,
-            providers = providers,
-            onDismiss = { editingModel = null },
-            onConfirm = { viewModel.updateModel(model.id, it) }
-        )
-    }
-
-    if (showAddProviderDialog) {
-        ProviderDialog(
-            onDismiss = { showAddProviderDialog = false },
-            onConfirm = { viewModel.addProvider(it) }
-        )
-    }
-
-    editingProvider?.let { provider ->
-        ProviderDialog(
-            provider = provider,
-            onDismiss = { editingProvider = null },
-            onConfirm = { viewModel.updateProvider(provider.id, it) }
         )
     }
 }
 
 @Composable
-private fun ModelDialog(
-    model: LlmModel? = null,
-    providers: List<Provider>,
-    onDismiss: () -> Unit,
-    onConfirm: (LlmModel) -> Unit
+private fun SessionDrawerItem(
+    session: com.forgeidea.data.local.entity.SessionEntity,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onRename: (String) -> Unit,
+    onDelete: () -> Unit
 ) {
-    var name by remember { mutableStateOf(model?.name ?: "") }
-    var id by remember { mutableStateOf(model?.id ?: "") }
-    var providerId by remember { mutableStateOf(model?.providerId ?: providers.firstOrNull()?.id ?: "") }
-    var expanded by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(if (model == null) "添加模型" else "编辑模型") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("显示名称") },
-                    singleLine = true
+    Box {
+        NavigationDrawerItem(
+            label = {
+                Text(
+                    session.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                OutlinedTextField(
-                    value = id,
-                    onValueChange = { id = it },
-                    label = { Text("模型 ID") },
-                    singleLine = true
-                )
+            },
+            selected = selected,
+            onClick = onClick,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+            badge = {
                 Box {
-                    OutlinedTextField(
-                        value = providers.find { it.id == providerId }?.name ?: "",
-                        onValueChange = {},
-                        label = { Text("服务商") },
-                        readOnly = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        trailingIcon = {
-                            Icon(
-                                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = null,
-                                modifier = Modifier.clickable { expanded = !expanded }
-                            )
-                        }
-                    )
+                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "更多", modifier = Modifier.size(18.dp))
+                    }
                     DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
                     ) {
-                        providers.forEach { provider ->
-                            DropdownMenuItem(
-                                text = { Text(provider.name) },
-                                onClick = {
-                                    providerId = provider.id
-                                    expanded = false
-                                }
-                            )
-                        }
+                        DropdownMenuItem(
+                            text = { Text("重命名") },
+                            onClick = {
+                                showMenu = false
+                                showRenameDialog = true
+                            },
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("删除") },
+                            onClick = {
+                                showMenu = false
+                                onDelete()
+                            },
+                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) }
+                        )
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (id.isNotBlank() && name.isNotBlank()) {
-                        onConfirm(LlmModel(id = id.trim(), name = name.trim(), providerId = providerId))
-                        onDismiss()
+        )
+    }
+
+    if (showRenameDialog) {
+        var newTitle by remember { mutableStateOf(session.title) }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("重命名会话") },
+            text = {
+                OutlinedTextField(
+                    value = newTitle,
+                    onValueChange = { newTitle = it },
+                    label = { Text("新名称") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newTitle.isNotBlank()) {
+                            onRename(newTitle.trim())
+                            showRenameDialog = false
+                        }
                     }
-                }
-            ) { Text("保存") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        }
-    )
+                ) { Text("保存") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) { Text("取消") }
+            }
+        )
+    }
 }
 
 @Composable
-private fun ProviderDialog(
-    provider: Provider? = null,
+private fun NewWorkspaceFileDialog(
     onDismiss: () -> Unit,
-    onConfirm: (Provider) -> Unit
+    onConfirm: (String, String) -> Unit
 ) {
-    var name by remember { mutableStateOf(provider?.name ?: "") }
-    var baseUrl by remember { mutableStateOf(provider?.baseUrl ?: "") }
-    var apiKey by remember { mutableStateOf(provider?.apiKey ?: "") }
-    val id = remember { provider?.id ?: UUID.randomUUID().toString() }
+    var path by remember { mutableStateOf("") }
+    var content by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (provider == null) "添加服务商" else "编辑服务商") },
+        title = { Text("新建文件") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("名称") },
+                    value = path,
+                    onValueChange = { path = it },
+                    label = { Text("路径") },
                     singleLine = true
                 )
                 OutlinedTextField(
-                    value = baseUrl,
-                    onValueChange = { baseUrl = it },
-                    label = { Text("Base URL") },
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = { apiKey = it },
-                    label = { Text("API Key") },
-                    singleLine = true
+                    value = content,
+                    onValueChange = { content = it },
+                    label = { Text("内容") },
+                    minLines = 3,
+                    maxLines = 6
                 )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (name.isNotBlank() && baseUrl.isNotBlank()) {
-                        onConfirm(Provider(id = id, name = name.trim(), baseUrl = baseUrl.trim(), apiKey = apiKey))
-                        onDismiss()
+                    if (path.isNotBlank()) {
+                        onConfirm(path.trim(), content)
                     }
                 }
-            ) { Text("保存") }
+            ) { Text("创建") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("取消") }
