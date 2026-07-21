@@ -5,6 +5,7 @@ import com.forgeidea.llm.model.ToolDefinition
 import com.forgeidea.llm.model.ToolFunction
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -75,8 +76,8 @@ class WorkspaceFileTools(private val context: Context) {
                         }
                     }
                     putJsonArray("required") {
-                        add("path")
-                        add("content")
+                        add(JsonPrimitive("path"))
+                        add(JsonPrimitive("content"))
                     }
                 }
             )
@@ -93,7 +94,7 @@ class WorkspaceFileTools(private val context: Context) {
                         }
                     }
                     putJsonArray("required") {
-                        add("path")
+                        add(JsonPrimitive("path"))
                     }
                 }
             )
@@ -114,8 +115,8 @@ class WorkspaceFileTools(private val context: Context) {
                         }
                     }
                     putJsonArray("required") {
-                        add("path")
-                        add("content")
+                        add(JsonPrimitive("path"))
+                        add(JsonPrimitive("content"))
                     }
                 }
             )

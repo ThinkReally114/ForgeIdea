@@ -1,6 +1,5 @@
 package com.forgeidea.di
 
-import com.forgeidea.data.datastore.ApiKeyStore
 import com.forgeidea.llm.LlmClient
 import com.forgeidea.llm.OpenAiCompatibleClient
 import com.forgeidea.llm.stream.SseParser
@@ -29,7 +28,6 @@ val networkModule = module {
         }
     }
     single { SseParser() }
-    single { ApiKeyStore(get()) }
     single<LlmClient> {
         OpenAiCompatibleClient(
             httpClient = get(),

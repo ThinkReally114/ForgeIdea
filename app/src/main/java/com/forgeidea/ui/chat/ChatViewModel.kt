@@ -17,6 +17,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.util.UUID
 
 class ChatViewModel(
@@ -232,8 +235,17 @@ class ChatViewModel(
                 chatRepository.addMessage(sessionId, assistantMsg)
                 _isStreaming.value = true
                 _error.value = null
-                val result = executeCommandTool.execute(command)
-                val output = result.getOrNull() ?: "❌ 命令执行失败"
+                val args = buildJsonObject { put("command", command) }
+                val result = executeCommandTool.execute(args)
+                val output = when (result) {
+                    is com.forgeidea.tools.ToolResult.Success -> {
+                        val stdout = result.data["stdout"]?.jsonPrimitive?.content ?: ""
+                        val stderr = result.data["stderr"]?.jsonPrimitive?.content ?: ""
+                        val exitCode = result.data["exitCode"]?.jsonPrimitive?.content ?: ""
+                        "stdout:\n$stdout\n\nstderr:\n$stderr\n\nexitCode: $exitCode"
+                    }
+                    is com.forgeidea.tools.ToolResult.Error -> "❌ ${result.message}"
+                }
                 chatRepository.updateMessage(sessionId, assistantMsg.copy(content = output))
             } catch (e: Exception) {
                 Log.e(TAG, "Command execution failed", e)
