@@ -90,7 +90,7 @@ fun ChatScreen(
                             viewModel.switchToSession(session.id)
                             scope.launch { drawerState.close() }
                         },
-                        trailingIcon = {
+                        badge = {
                             IconButton(onClick = { viewModel.deleteSession(session.id) }) {
                                 Icon(Icons.Default.Delete, contentDescription = "删除", modifier = Modifier.width(20.dp))
                             }
