@@ -1,24 +1,45 @@
 package com.forgeidea.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material3.DropdownMenu
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,9 +51,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.forgeidea.domain.model.LlmModel
 import com.forgeidea.ui.theme.CapsuleShape
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatInput(
     onSend: (String) -> Unit,
@@ -45,44 +69,63 @@ fun ChatInput(
 ) {
     var text by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
+    var showFullScreen by remember { mutableStateOf(false) }
     val selectedModel = models.find { it.id == selectedModelId } ?: models.firstOrNull()
+    val hasText = text.isNotBlank()
+
+    if (showFullScreen) {
+        FullScreenInputDialog(
+            initialText = text,
+            onDismiss = { showFullScreen = false },
+            onConfirm = {
+                text = it
+                showFullScreen = false
+            }
+        )
+    }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Bottom
     ) {
         Box(
             modifier = Modifier
                 .weight(1f)
                 .clip(CapsuleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .animateContentSize()
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.Bottom
             ) {
-                Column(
-                    modifier = Modifier
-                        .padding(end = 8.dp)
-                        .widthIn(min = 80.dp)
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { if (enabled && models.size > 1) expanded = it },
+                    modifier = Modifier.padding(end = 8.dp)
                 ) {
                     Text(
-                        text = selectedModel?.name?.take(12) ?: "模型",
+                        text = selectedModel?.name?.take(10) ?: "模型",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                             .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.primaryContainer)
-                            .clickable(enabled = models.size > 1) { expanded = true }
+                            .clickable(
+                                enabled = models.size > 1 && enabled,
+                                onClick = { expanded = true }
+                            )
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     )
-                    DropdownMenu(
+                    ExposedDropdownMenu(
                         expanded = expanded,
-                        onDismissRequest = { expanded = false }
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.exposedDropdownSize()
                     ) {
                         models.forEach { model ->
                             DropdownMenuItem(
@@ -96,7 +139,12 @@ fun ChatInput(
                     }
                 }
 
-                Box(modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 24.dp, max = 140.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
                     if (text.isEmpty()) {
                         Text(
                             text = placeholder,
@@ -114,30 +162,114 @@ fun ChatInput(
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         enabled = enabled,
                         singleLine = false,
-                        maxLines = 5
+                        maxLines = 6
                     )
+                }
+
+                IconButton(
+                    onClick = { showFullScreen = true },
+                    modifier = Modifier.size(32.dp),
+                    enabled = enabled
+                ) {
+                    AnimatedContent(
+                        targetState = showFullScreen,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "expandIcon"
+                    ) {
+                        Icon(
+                            imageVector = if (it) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = "展开全屏输入",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = hasText,
+                    enter = scaleIn(initialScale = 0.5f) + fadeIn(),
+                    exit = scaleOut(targetScale = 0.5f) + fadeOut()
+                ) {
+                    IconButton(
+                        onClick = {
+                            if (text.isNotBlank()) {
+                                onSend(text.trim())
+                                text = ""
+                            }
+                        },
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        enabled = enabled
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "发送",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
-        IconButton(
-            onClick = {
-                if (text.isNotBlank()) {
-                    onSend(text.trim())
-                    text = ""
-                }
-            },
-            modifier = Modifier
-                .padding(start = 8.dp)
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary),
-            enabled = enabled && text.isNotBlank()
+    }
+}
+
+@Composable
+private fun FullScreenInputDialog(
+    initialText: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(initialText) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
         ) {
-            Icon(
-                imageVector = Icons.Default.Send,
-                contentDescription = "发送",
-                tint = MaterialTheme.colorScheme.onPrimary
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("长文本输入", style = MaterialTheme.typography.titleLarge)
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "关闭")
+                    }
+                }
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(vertical = 12.dp)
+                        .verticalScroll(rememberScrollState()),
+                    placeholder = { Text("在此输入长内容...") },
+                    textStyle = MaterialTheme.typography.bodyLarge
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Button(onClick = onDismiss) { Text("取消") }
+                    Button(
+                        onClick = { onConfirm(text) },
+                        enabled = text.isNotBlank(),
+                        modifier = Modifier.padding(start = 12.dp)
+                    ) { Text("确认") }
+                }
+            }
         }
     }
 }
