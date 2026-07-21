@@ -75,4 +75,5 @@ dependencies {
     implementation(libs.m3color)
     implementation(libs.capsule)
     implementation(libs.dotlottie.android)
+    implementation(libs.jgit.core)
 }

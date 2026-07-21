@@ -8,16 +8,21 @@ import com.forgeidea.domain.model.ChatRole
 import com.forgeidea.domain.model.LlmModel
 import com.forgeidea.domain.model.Message
 import com.forgeidea.domain.usecase.SendMessageUseCase
+import com.forgeidea.tools.ExecuteCommandTool
+import com.forgeidea.tools.ToolResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import java.util.UUID
 
 class ChatViewModel(
     private val sendMessageUseCase: SendMessageUseCase,
-    private val apiKeyStore: ApiKeyStore
+    private val apiKeyStore: ApiKeyStore,
+    private val executeCommandTool: ExecuteCommandTool
 ) : ViewModel() {
 
     private val _messages = MutableStateFlow<List<Message>>(emptyList())
@@ -67,6 +72,12 @@ class ChatViewModel(
         )
         _messages.update { it + userMsg }
 
+        if (text.startsWith("/exec ")) {
+            val command = text.removePrefix("/exec ")
+            handleCommandExecution(command)
+            return
+        }
+
         val assistantMsg = Message(
             id = UUID.randomUUID().toString(),
             sessionId = "default",
@@ -108,6 +119,48 @@ class ChatViewModel(
                 _error.value = e.message ?: "未知错误"
                 _messages.update { msgs ->
                     msgs.map { if (it.id == assistantMsg.id) it.copy(content = "❌ ${e.message ?: "请求失败"}") else it }
+                }
+            } finally {
+                _isStreaming.value = false
+            }
+        }
+    }
+
+    private fun handleCommandExecution(command: String) {
+        _isStreaming.value = true
+        val assistantMsg = Message(
+            id = UUID.randomUUID().toString(),
+            sessionId = "default",
+            role = ChatRole.ASSISTANT,
+            content = "",
+            reasoning = "",
+            timestamp = System.currentTimeMillis()
+        )
+        _messages.update { it + assistantMsg }
+        viewModelScope.launch {
+            try {
+                val args = buildJsonObject { put("command", JsonPrimitive(command)) }
+                val result = executeCommandTool.execute(args)
+                val content = when (result) {
+                    is ToolResult.Success -> {
+                        val stdout = result.data["stdout"]?.toString() ?: ""
+                        val stderr = result.data["stderr"]?.toString() ?: ""
+                        val exitCode = result.data["exitCode"]?.toString() ?: ""
+                        buildString {
+                            if (stdout.isNotBlank()) appendLine("stdout:\n$stdout")
+                            if (stderr.isNotBlank()) appendLine("stderr:\n$stderr")
+                            append("exitCode: $exitCode")
+                        }
+                    }
+                    is ToolResult.Error -> "❌ ${result.message}"
+                }
+                _messages.update { msgs ->
+                    msgs.map { if (it.id == assistantMsg.id) it.copy(content = content) else it }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "handleCommandExecution failed", e)
+                _messages.update { msgs ->
+                    msgs.map { if (it.id == assistantMsg.id) it.copy(content = "❌ ${e.message ?: "执行失败"}") else it }
                 }
             } finally {
                 _isStreaming.value = false

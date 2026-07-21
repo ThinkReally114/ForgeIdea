@@ -17,6 +17,7 @@ m3color = "2026.1"
 capsule = "1.0.1"
 dotlottie = "0.15.0"
 security-crypto = "1.1.0-alpha06"
+jgit = "6.10.0.202406032230-r"
 
 [libraries]
 androidx-core-ktx = "androidx.core:core-ktx:1.13.1"
@@ -57,6 +58,7 @@ haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 m3color = { module = "com.github.kyant0:m3color", version.ref = "m3color" }
 capsule = { module = "com.github.kyant0:capsule", version.ref = "capsule" }
 dotlottie-android = { module = "com.github.lottiefiles:dotlottie-android", version.ref = "dotlottie" }
+jgit-core = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "jgit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -4,6 +4,10 @@ import androidx.room.Room
 import com.forgeidea.data.local.AppDatabase
 import com.forgeidea.data.local.dao.MessageDao
 import com.forgeidea.data.local.dao.SessionDao
+import com.forgeidea.git.GitTool
+import com.forgeidea.terminal.ProotShellExecutor
+import com.forgeidea.terminal.ShellExecutor
+import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 
 val appModule = module {
@@ -14,4 +18,6 @@ val appModule = module {
     }
     single<SessionDao> { get<AppDatabase>().sessionDao() }
     single<MessageDao> { get<AppDatabase>().messageDao() }
+    single<ShellExecutor> { ProotShellExecutor(androidContext(), get()) }
+    single { GitTool(androidContext().filesDir.resolve("workspace")) }
 }
