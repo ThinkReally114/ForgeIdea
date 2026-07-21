@@ -167,7 +167,7 @@ fun MessageBubble(
                     )
                 }
             } else if (!isUser && isLoading) {
-                NpmProgress(
+                LoadingText(
                     modifier = Modifier.padding(top = if (message.reasoning.isNotBlank()) 8.dp else 0.dp)
                 )
             }
@@ -196,19 +196,17 @@ fun MessageBubble(
 }
 
 @Composable
-private fun NpmProgress(modifier: Modifier = Modifier) {
-    var progress by remember { mutableIntStateOf(0) }
+private fun LoadingText(modifier: Modifier = Modifier) {
+    val labels = listOf("Thinking...", "Building...", "Working...", "Coding...", "Crafting...")
+    var index by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
-            delay(120)
-            progress = (progress + 1) % 11
+            delay(800)
+            index = (index + 1) % labels.size
         }
     }
-    val filled = "=".repeat(progress)
-    val empty = " ".repeat(10 - progress)
-    val arrow = if (progress < 10) ">" else "="
     Text(
-        text = "[$filled$arrow$empty] 请求中...",
+        text = labels[index],
         style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier

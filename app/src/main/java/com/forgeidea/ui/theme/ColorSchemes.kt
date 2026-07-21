@@ -6,7 +6,7 @@ import androidx.compose.ui.graphics.Color
 import com.forgeidea.domain.model.PresetTheme
 
 object ColorSchemes {
-    val QzPurpleDark = darkColorScheme(
+    val PurpleDark = darkColorScheme(
         primary = Color(0xFFC4A3FF),
         onPrimary = Color(0xFF1A1B2E),
         primaryContainer = Color(0xFF2D1B4E),
@@ -72,7 +72,7 @@ object ColorSchemes {
     )
 
     fun forTheme(theme: PresetTheme): ColorScheme = when (theme) {
-        PresetTheme.QZ_PURPLE -> QzPurpleDark
+        PresetTheme.PURPLE -> PurpleDark
         PresetTheme.DEEP_SPACE -> DeepSpaceDark
         PresetTheme.AURORA_GREEN -> AuroraGreenDark
         PresetTheme.WARM_ORANGE -> WarmOrangeDark

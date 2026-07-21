@@ -90,8 +90,8 @@ class ApiKeyStore(context: Context) {
     }
 
     fun getTheme(): PresetTheme {
-        val name = plainPrefs.getString(KEY_THEME, null) ?: return PresetTheme.QZ_PURPLE
-        return runCatching { PresetTheme.valueOf(name) }.getOrDefault(PresetTheme.QZ_PURPLE)
+        val name = plainPrefs.getString(KEY_THEME, null) ?: return PresetTheme.PURPLE
+        return runCatching { PresetTheme.valueOf(name) }.getOrDefault(PresetTheme.PURPLE)
     }
 
     fun setTheme(theme: PresetTheme) {

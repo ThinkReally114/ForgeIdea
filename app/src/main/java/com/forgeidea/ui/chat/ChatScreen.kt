@@ -20,8 +20,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -75,6 +76,7 @@ import com.forgeidea.ui.components.ChatInput
 import com.forgeidea.ui.components.MessageBubble
 import com.forgeidea.ui.components.ModelSelectionDialog
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -185,7 +187,7 @@ fun ChatScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
+                        containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.65f),
                         titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
@@ -198,22 +200,42 @@ fun ChatScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
+                val listState = rememberLazyListState()
                 val lastMessage = messages.lastOrNull()
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    reverseLayout = false,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(messages, key = { it.id }) { msg ->
-                        val loading = msg.id == lastMessage?.id && isStreaming && msg.role != ChatRole.USER
-                        MessageBubble(
-                            message = msg,
-                            isLoading = loading,
-                            onAnimated = { viewModel.markMessageAnimated(it) }
-                        )
+
+                LaunchedEffect(messages.size, lastMessage?.id) {
+                    if (messages.isNotEmpty()) {
+                        listState.animateScrollToItem(messages.lastIndex)
+                    }
+                }
+
+                if (messages.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        EmptySessionGreeting()
+                    }
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
+                        reverseLayout = false,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(messages, key = { it.id }) { msg ->
+                            val loading = msg.id == lastMessage?.id && isStreaming && msg.role != ChatRole.USER
+                            MessageBubble(
+                                message = msg,
+                                isLoading = loading,
+                                onAnimated = { viewModel.markMessageAnimated(it) }
+                            )
+                        }
                     }
                 }
 
@@ -234,7 +256,9 @@ fun ChatScreen(
                 }
 
                 Column(
-                    modifier = Modifier.imePadding()
+                    modifier = Modifier
+                        .imePadding()
+                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.65f))
                 ) {
                     if (models.isNotEmpty()) {
                         Row(
@@ -265,6 +289,36 @@ fun ChatScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EmptySessionGreeting() {
+    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    val greeting = when (hour) {
+        in 5..11 -> "早上好"
+        in 12..17 -> "下午好"
+        else -> "晚上好"
+    }
+    val slogans = listOf(
+        "有什么我能帮你的吗？",
+        "我准备好构建了。",
+        "今天想写点什么？",
+        "随时可以开始。"
+    )
+    val slogan = remember { slogans.random() }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "$greeting，",
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = slogan,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
 }
 

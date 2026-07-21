@@ -9,7 +9,7 @@ import com.forgeidea.domain.model.PresetTheme
 
 @Composable
 fun ForgeIdeaTheme(
-    theme: PresetTheme = PresetTheme.QZ_PURPLE,
+    theme: PresetTheme = PresetTheme.PURPLE,
     content: @Composable () -> Unit
 ) {
     val colorScheme = ColorSchemes.forTheme(theme)
