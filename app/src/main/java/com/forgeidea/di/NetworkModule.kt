@@ -6,6 +6,7 @@ import com.forgeidea.llm.OpenAiCompatibleClient
 import com.forgeidea.llm.stream.SseParser
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
@@ -20,6 +21,11 @@ val networkModule = module {
                 json(Json { ignoreUnknownKeys = true })
             }
             install(Logging) { level = LogLevel.NONE }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 120_000
+                connectTimeoutMillis = 30_000
+                socketTimeoutMillis = 120_000
+            }
         }
     }
     single { SseParser() }
