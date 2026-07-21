@@ -9,7 +9,12 @@ class ProotBinaryManager(private val context: Context) {
     fun getProotPath(): String? {
         val nativeDir = context.applicationInfo.nativeLibraryDir ?: return findSystemProot()
         val so = File(nativeDir, "libproot.so")
-        if (so.exists() && so.canExecute()) return so.absolutePath
+        if (so.exists()) {
+            if (!so.canExecute()) {
+                so.setExecutable(true, false)
+            }
+            if (so.canExecute()) return so.absolutePath
+        }
         return findSystemProot()
     }
 

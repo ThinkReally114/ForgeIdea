@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class ProotShellExecutor(
-    context: Context,
+    private val context: Context,
     httpClient: HttpClient
 ) : ShellExecutor {
 
@@ -78,13 +78,17 @@ class ProotShellExecutor(
     private fun startProcess(command: String, cwd: String?): SessionProcess {
         val proot = binaryManager.getProotPath()
             ?: throw IllegalStateException("proot 不可用")
+        val nativeLibDir = context.applicationInfo.nativeLibraryDir
+            ?: throw IllegalStateException("nativeLibraryDir 不可用")
         val builder = ProotCommandBuilder(
             proot,
             rootfsManager.rootfsPath(),
-            rootfsManager.workspaceHostPath().absolutePath
+            rootfsManager.workspaceHostPath().absolutePath,
+            nativeLibDir
         )
-        val args = builder.build(command, cwd)
+        val (args, env) = builder.build(command, cwd)
         val pb = ProcessBuilder(args)
+        pb.environment().putAll(env)
         val process = pb.start()
         return SessionProcess(process)
     }

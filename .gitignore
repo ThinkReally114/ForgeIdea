@@ -9,3 +9,18 @@ local.properties
 .idea/
 .DS_Store
 Thumbs.db
+
+# proot build intermediates
+app/proot-build/proot/
+app/proot-build/talloc/
+app/proot-build/talloc-install/
+app/proot-build/termux-debs/
+app/proot-build/termux-proot/
+app/proot-build/proot-static/
+app/proot-build/ndk/
+app/proot-build/extracted/
+app/proot-build/*.tar.gz
+app/proot-build/*.tar.xz
+app/proot-build/*.deb
+app/proot-build/Packages*
+app/proot-build/*.txt
