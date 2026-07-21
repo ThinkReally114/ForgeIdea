@@ -3,6 +3,7 @@ package com.forgeidea.llm
 import com.forgeidea.data.datastore.ApiKeyStore
 import com.forgeidea.llm.model.ChatMessage
 import com.forgeidea.llm.model.ChatRequest
+import com.forgeidea.llm.model.ChatResponse
 import com.forgeidea.llm.model.StreamChunk
 import com.forgeidea.llm.stream.SseParser
 import io.ktor.client.HttpClient
@@ -11,6 +12,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
@@ -38,35 +40,46 @@ class OpenAiCompatibleClient(
         val request = ChatRequest(
             model = model,
             messages = messages,
-            stream = true,
+            stream = false,
             temperature = 0.7
         )
         val url = "${baseUrl.trimEnd('/')}/chat/completions"
-        Log.i(TAG, "streamChat: POST $url model=$model")
+        val requestBody = json.encodeToString(ChatRequest.serializer(), request)
+        Log.i(TAG, "chat: POST $url model=$model body=$requestBody")
 
         val response: HttpResponse = httpClient.post(url) {
             header(HttpHeaders.Authorization, "Bearer $apiKey")
             contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(ChatRequest.serializer(), request))
+            setBody(requestBody)
         }
+
+        Log.i(TAG, "chat: response status=${response.status}")
 
         if (response.status.value >= 400) {
             val errBody = response.bodyAsChannel().readUTF8Line(limit = 8192) ?: ""
             throw IllegalStateException("API 返回 ${response.status.value}: $errBody")
         }
 
-        Log.i(TAG, "streamChat: response ${response.status}")
+        val body = response.bodyAsText()
+        Log.i(TAG, "chat: response body=$body")
 
-        val channel = response.bodyAsChannel()
-        while (!channel.isClosedForRead) {
-            val line = channel.readUTF8Line(limit = 8192) ?: break
-            if (line.isBlank()) continue
-            val chunk = sseParser.parse(line)
-            if (chunk != null) {
-                if (chunk.isDone) break
-                if (chunk.content.isNotEmpty() || chunk.reasoning.isNotEmpty()) emit(chunk)
-            }
+        val chatResponse = try {
+            json.decodeFromString(ChatResponse.serializer(), body)
+        } catch (e: Exception) {
+            throw IllegalStateException("解析响应失败: ${e.message}")
         }
+
+        val message = chatResponse.choices.firstOrNull()?.message
+            ?: throw IllegalStateException("API 返回 choices 为空")
+
+        val content = message.content ?: ""
+        val reasoning = message.reasoningContent ?: message.reasoning ?: ""
+
+        if (content.isBlank() && reasoning.isBlank()) {
+            throw IllegalStateException("API 返回内容为空")
+        }
+
+        emit(StreamChunk(content = content, reasoning = reasoning))
     }
 
     override suspend fun chat(messages: List<ChatMessage>, model: String): String {

@@ -1,5 +1,6 @@
 package com.forgeidea.ui.chat
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.forgeidea.data.datastore.ApiKeyStore
@@ -96,7 +97,14 @@ class ChatViewModel(
                         }
                     }
                 }
+                val finalAssistant = _messages.value.find { it.id == assistantMsg.id }
+                if (finalAssistant != null && finalAssistant.content.isBlank() && finalAssistant.reasoning.isBlank()) {
+                    _messages.update { msgs ->
+                        msgs.map { if (it.id == assistantMsg.id) it.copy(content = "❌ 没有收到回复内容") else it }
+                    }
+                }
             } catch (e: Exception) {
+                Log.e(TAG, "sendUserMessage failed", e)
                 _error.value = e.message ?: "未知错误"
                 _messages.update { msgs ->
                     msgs.map { if (it.id == assistantMsg.id) it.copy(content = "❌ ${e.message ?: "请求失败"}") else it }
@@ -109,5 +117,9 @@ class ChatViewModel(
 
     fun clearError() {
         _error.value = null
+    }
+
+    companion object {
+        private const val TAG = "ChatViewModel"
     }
 }
