@@ -24,21 +24,25 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.forgeidea.domain.model.ChatRole
 import com.forgeidea.domain.model.Message
+import com.mikepenz.markdown.m3.Markdown
 import kotlinx.coroutines.delay
 
 @Composable
 fun MessageBubble(
     message: Message,
+    isLoading: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val isUser = message.role == ChatRole.USER
@@ -48,7 +52,6 @@ fun MessageBubble(
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     }
 
-    // 用 rememberSaveable 防止导航返回后动画重播
     var hasAnimated by rememberSaveable(message.id) { mutableStateOf(false) }
     val slideOffset = remember { Animatable(if (isUser && !hasAnimated) 300f else 0f) }
 
@@ -85,15 +88,14 @@ fun MessageBubble(
 
             if (message.reasoning.isNotBlank()) {
                 var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
-                var showReasoning by remember { mutableStateOf(false) }
+                var showReasoning by rememberSaveable(message.id) { mutableStateOf(false) }
 
                 LaunchedEffect(expanded) {
-                    if (expanded) {
-                        // 分阶段: 先展开容器(等300ms动画), 再显示思考内容
+                    if (expanded && !showReasoning) {
                         showReasoning = false
                         delay(300)
                         showReasoning = true
-                    } else {
+                    } else if (!expanded) {
                         showReasoning = false
                     }
                 }
@@ -142,13 +144,44 @@ fun MessageBubble(
             }
 
             if (message.content.isNotBlank()) {
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                if (isUser) {
+                    Text(
+                        text = message.content,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(top = if (message.reasoning.isNotBlank()) 8.dp else 0.dp)
+                    )
+                } else {
+                    Markdown(
+                        content = message.content,
+                        modifier = Modifier.padding(top = if (message.reasoning.isNotBlank()) 8.dp else 0.dp)
+                    )
+                }
+            } else if (!isUser && isLoading) {
+                NpmProgress(
                     modifier = Modifier.padding(top = if (message.reasoning.isNotBlank()) 8.dp else 0.dp)
                 )
             }
         }
     }
+}
+
+@Composable
+private fun NpmProgress(modifier: Modifier = Modifier) {
+    var progress by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(120)
+            progress = (progress + 1) % 11
+        }
+    }
+    val filled = "=".repeat(progress)
+    val empty = " ".repeat(10 - progress)
+    val arrow = if (progress < 10) ">" else "="
+    Text(
+        text = "[$filled$arrow$empty] 请求中...",
+        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier
+    )
 }

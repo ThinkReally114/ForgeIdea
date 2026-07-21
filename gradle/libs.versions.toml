@@ -18,6 +18,7 @@ capsule = "1.0.1"
 dotlottie = "0.15.0"
 security-crypto = "1.1.0-alpha06"
 jgit = "6.10.0.202406032230-r"
+markdown = "0.26.0"
 
 [libraries]
 androidx-core-ktx = "androidx.core:core-ktx:1.13.1"
@@ -59,6 +60,7 @@ m3color = { module = "com.github.kyant0:m3color", version.ref = "m3color" }
 capsule = { module = "com.github.kyant0:capsule", version.ref = "capsule" }
 dotlottie-android = { module = "com.github.lottiefiles:dotlottie-android", version.ref = "dotlottie" }
 jgit-core = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "jgit" }
+markdown-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdown" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,0 +1,43 @@
+feat: 侧边栏集成设置 + 系统返回处理 + Markdown + npm进度 + 动画优化
+
+1. 侧边栏改造
+   - 宽度从默认 360dp 改为 300dp
+   - 应用主题色 surface 作为背景
+   - 系统侧滑返回(BackHandler): 抽屉打开时关闭抽屉,不退出应用
+   - 原设置入口移除,改为顶部显示当前会话标题
+   - 设置内容折叠在侧边栏内(API Key/Base URL/模型/主题)
+
+2. 设置移除独立页面
+   - MainActivity 删除 NavHost 和 Settings route
+   - 设置功能全部集成到侧边栏
+
+3. 模型选择改为自制模态框
+   - 点击输入框内模型 chip 弹出 Dialog
+   - 卡片列表显示模型 name/id + 选中圆点
+
+4. 输入框
+   - placeholder 改为 Work with ForgeIdea...
+   - 移除发送按钮的进入/退出动画(用普通 if 条件显示)
+
+5. Agent 消息
+   - 支持 Markdown 渲染(使用 com.mikepenz:multiplatform-markdown-renderer-m3)
+   - 用户消息仍用普通 Text
+
+6. 等待 API 返回进度
+   - 当前最后一条空 Agent 消息显示 npm 风格进度条
+   - [=>        ] 动态填充,120ms 更新一次
+
+7. 思考过程动画修复
+   - expanded 和 showReasoning 都用 rememberSaveable 保存
+   - 展开后离开再返回不再重播展开动画
+   - 用户点击展开仍保持先展开容器再显示内容
+
+8. 主题持久化
+   - ThemeViewModel 已接入,侧边栏主题切换立即生效并持久化
+
+9. 多对话/会话持久化
+   - 侧边栏显示对话列表,支持新建/切换/删除
+   - 顶部显示当前会话标题
+   - 新增 renameSession 支持
+
+Author: ThinkReally114

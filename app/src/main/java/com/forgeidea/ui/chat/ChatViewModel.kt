@@ -49,6 +49,9 @@ class ChatViewModel(
     private val _sessions = MutableStateFlow<List<SessionEntity>>(emptyList())
     val sessions: StateFlow<List<SessionEntity>> = _sessions.asStateFlow()
 
+    private val _currentSessionTitle = MutableStateFlow("")
+    val currentSessionTitle: StateFlow<String> = _currentSessionTitle.asStateFlow()
+
     private var messageObserverJob: Job? = null
 
     init {
@@ -61,8 +64,14 @@ class ChatViewModel(
         viewModelScope.launch {
             chatRepository.observeSessions().collect { sessions ->
                 _sessions.value = sessions
+                updateCurrentSessionTitle()
             }
         }
+    }
+
+    private fun updateCurrentSessionTitle() {
+        val id = _currentSessionId.value
+        _currentSessionTitle.value = _sessions.value.find { it.id == id }?.title ?: ""
     }
 
     private fun loadCurrentSession() {
@@ -72,6 +81,7 @@ class ChatViewModel(
                 ?: chatRepository.getCurrentOrCreateSession(_selectedModelId.value).also {
                     _currentSessionId.value = it.id
                 }.id
+            updateCurrentSessionTitle()
             chatRepository.observeMessages(sessionId).collect { msgs ->
                 _messages.value = msgs
             }
@@ -98,6 +108,7 @@ class ChatViewModel(
         viewModelScope.launch {
             val session = chatRepository.createNewSession(_selectedModelId.value)
             _currentSessionId.value = session.id
+            _currentSessionTitle.value = session.title
             _messages.value = emptyList()
             messageObserverJob?.cancel()
             messageObserverJob = viewModelScope.launch {
@@ -112,6 +123,7 @@ class ChatViewModel(
         viewModelScope.launch {
             val session = chatRepository.switchToSession(id) ?: return@launch
             _currentSessionId.value = session.id
+            _currentSessionTitle.value = session.title
             _selectedModelId.value = session.modelId
             messageObserverJob?.cancel()
             messageObserverJob = viewModelScope.launch {
@@ -128,6 +140,17 @@ class ChatViewModel(
             if (_currentSessionId.value == id) {
                 _currentSessionId.value = null
                 loadCurrentSession()
+            } else {
+                updateCurrentSessionTitle()
+            }
+        }
+    }
+
+    fun renameSession(id: String, title: String) {
+        viewModelScope.launch {
+            chatRepository.renameSession(id, title)
+            if (_currentSessionId.value == id) {
+                updateCurrentSessionTitle()
             }
         }
     }

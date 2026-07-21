@@ -1,13 +1,5 @@
 package com.forgeidea.ui.components
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,14 +23,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,13 +40,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.forgeidea.domain.model.LlmModel
 import com.forgeidea.ui.theme.CapsuleShape
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatInput(
     onSend: (String) -> Unit,
@@ -64,14 +54,26 @@ fun ChatInput(
     selectedModelId: String,
     onModelSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "输入消息...",
+    placeholder: String = "Work with ForgeIdea...",
     enabled: Boolean = true
 ) {
     var text by remember { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
+    var showModelDialog by remember { mutableStateOf(false) }
     var showFullScreen by remember { mutableStateOf(false) }
     val selectedModel = models.find { it.id == selectedModelId } ?: models.firstOrNull()
     val hasText = text.isNotBlank()
+
+    if (showModelDialog) {
+        ModelSelectionDialog(
+            models = models,
+            selectedId = selectedModelId,
+            onSelect = {
+                onModelSelected(it)
+                showModelDialog = false
+            },
+            onDismiss = { showModelDialog = false }
+        )
+    }
 
     if (showFullScreen) {
         FullScreenInputDialog(
@@ -95,7 +97,6 @@ fun ChatInput(
                 .weight(1f)
                 .clip(CapsuleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                .animateContentSize()
         ) {
             Row(
                 modifier = Modifier
@@ -103,41 +104,17 @@ fun ChatInput(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { if (enabled && models.size > 1) expanded = it },
-                    modifier = Modifier.padding(end = 8.dp)
-                ) {
-                    Text(
-                        text = selectedModel?.name?.take(10) ?: "模型",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer)
-                            .clickable(
-                                enabled = models.size > 1 && enabled,
-                                onClick = { expanded = true }
-                            )
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                        modifier = Modifier.exposedDropdownSize()
-                    ) {
-                        models.forEach { model ->
-                            DropdownMenuItem(
-                                text = { Text(model.name) },
-                                onClick = {
-                                    onModelSelected(model.id)
-                                    expanded = false
-                                }
-                            )
-                        }
-                    }
-                }
+                Text(
+                    text = selectedModel?.name?.take(10) ?: "模型",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .clickable(enabled = models.size > 1 && enabled) { showModelDialog = true }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
 
                 Box(
                     modifier = Modifier
@@ -152,7 +129,7 @@ fun ChatInput(
                         modifier = Modifier.fillMaxWidth(),
                         textStyle = MaterialTheme.typography.bodyLarge.copy(
                             color = MaterialTheme.colorScheme.onSurface,
-                            platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+                            platformStyle = PlatformTextStyle(includeFontPadding = false)
                         ),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         enabled = enabled,
@@ -164,7 +141,7 @@ fun ChatInput(
                                     text = placeholder,
                                     style = MaterialTheme.typography.bodyLarge.copy(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+                                        platformStyle = PlatformTextStyle(includeFontPadding = false)
                                     )
                                 )
                             }
@@ -178,24 +155,14 @@ fun ChatInput(
                     modifier = Modifier.size(32.dp),
                     enabled = enabled
                 ) {
-                    AnimatedContent(
-                        targetState = showFullScreen,
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
-                        label = "expandIcon"
-                    ) {
-                        Icon(
-                            imageVector = if (it) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = "展开全屏输入",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Icon(
+                        imageVector = if (showFullScreen) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = "展开全屏输入",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
-                AnimatedVisibility(
-                    visible = hasText,
-                    enter = scaleIn(initialScale = 0.5f) + fadeIn(),
-                    exit = scaleOut(targetScale = 0.5f) + fadeOut()
-                ) {
+                if (hasText) {
                     IconButton(
                         onClick = {
                             if (text.isNotBlank()) {
@@ -216,6 +183,91 @@ fun ChatInput(
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(20.dp)
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModelSelectionDialog(
+    models: List<LlmModel>,
+    selectedId: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("选择模型", style = MaterialTheme.typography.titleLarge)
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "关闭")
+                    }
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    models.forEach { model ->
+                        val selected = model.id == selectedId
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onSelect(model.id) },
+                            color = if (selected) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = model.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                                        else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = model.id,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                if (selected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

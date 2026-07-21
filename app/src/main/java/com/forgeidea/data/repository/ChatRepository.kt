@@ -68,6 +68,11 @@ class ChatRepository(
         }
     }
 
+    suspend fun renameSession(id: String, title: String) {
+        val session = sessionDao.getById(id) ?: return
+        sessionDao.update(session.copy(title = title))
+    }
+
     suspend fun addMessage(sessionId: String, message: Message) {
         messageDao.insert(message.toEntity(sessionId))
         val session = sessionDao.getById(sessionId) ?: return

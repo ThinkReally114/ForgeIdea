@@ -76,4 +76,5 @@ dependencies {
     implementation(libs.capsule)
     implementation(libs.dotlottie.android)
     implementation(libs.jgit.core)
+    implementation(libs.markdown.m3)
 }
